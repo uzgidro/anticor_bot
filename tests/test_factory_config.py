@@ -44,14 +44,17 @@ async def test_factory_builds_dispatcher_with_middleware_order(settings):
     bot, dp, redis, engine = factory.build(settings)
     try:
         names = [type(m).__name__ for m in dp.update.outer_middleware]
-        assert "ThrottlingMiddleware" in names
         assert "DbSessionMiddleware" in names
         assert "UserMiddleware" in names
-        # Documented order: Throttling (reject flood before DB) -> DbSession ->
-        # User -> i18n.
-        assert names.index("ThrottlingMiddleware") < names.index("DbSessionMiddleware")
+        # Outer order: DbSession -> User -> i18n (i18n needs db_user's locale).
         assert names.index("DbSessionMiddleware") < names.index("UserMiddleware")
         assert names.index("UserMiddleware") < names.index("I18nMiddleware")
+        # Throttling moved to message/callback (inner) so it runs AFTER aiogram's
+        # FSMContextMiddleware and can read `state` to exempt mid-form users.
+        msg_mw = [type(m).__name__ for m in dp.message.middleware]
+        cb_mw = [type(m).__name__ for m in dp.callback_query.middleware]
+        assert "ThrottlingMiddleware" in msg_mw
+        assert "ThrottlingMiddleware" in cb_mw
     finally:
         await redis.aclose()
         await engine.dispose()

@@ -30,13 +30,25 @@ def _service(session, settings: Settings) -> SubmissionService:
 
 
 async def _authorize(
-    query: CallbackQuery, submission_id: int, db_user: User, session, i18n: I18nContext
+    query: CallbackQuery, submission_id: int, db_user: User, session, i18n: I18nContext,
+    *, require_owner: bool = False,
 ):
-    """Return the submission if the user may act on it, else answer and None."""
+    """Return the submission if the user may act on it, else answer and None.
+
+    Authorization is derived server-side: the user must be responsible for THIS
+    submission's type (or admin). When ``require_owner`` is set (reply/close),
+    the user must also be the assignee (the one who took it) or an admin — the
+    model is first-claim ownership, so colleagues can't act on each other's
+    cases. Callback data is never trusted for authz.
+    """
     sub = await SubmissionRepository(session).get(submission_id)
     if sub is None or not can_handle_type(db_user, sub.type):
         await query.answer(i18n.get("admin-only"), show_alert=True)
         return None
+    if require_owner and not db_user.is_admin:
+        if sub.assigned_to_user_id not in (None, db_user.id):
+            await query.answer(i18n.get("admin-only"), show_alert=True)
+            return None
     return sub
 
 
@@ -79,12 +91,13 @@ async def on_close(
     i18n: I18nContext, settings: Settings,
 ) -> None:
     svc = _service(session, settings)
-    sub = await _authorize(query, callback_data.submission_id, db_user, session, i18n)
+    sub = await _authorize(
+        query, callback_data.submission_id, db_user, session, i18n, require_owner=True
+    )
     if sub is None:
         return
-    prev = sub.status.value
-    closed = await svc.repo.close(sub.id, db_user.id)
-    if not closed:
+    prev = await svc.repo.close(sub.id, db_user.id)
+    if prev is None:
         await query.answer(i18n.get("cb-closed"))
         return
     await svc.repo.record_status_event(sub.id, db_user.id, prev, "closed")
@@ -111,7 +124,9 @@ async def on_reply_start(
     query: CallbackQuery, callback_data: ReactionCb, db_user: User, session,
     i18n: I18nContext, state: FSMContext, settings: Settings,
 ) -> None:
-    sub = await _authorize(query, callback_data.submission_id, db_user, session, i18n)
+    sub = await _authorize(
+        query, callback_data.submission_id, db_user, session, i18n, require_owner=True
+    )
     if sub is None:
         return
     await state.set_state(ResponseForm.text)

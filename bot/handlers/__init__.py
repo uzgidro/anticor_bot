@@ -13,11 +13,13 @@ from bot.handlers import admin, errors, my_submissions, responsible, start, subm
 router = Router(name="root")
 
 # Order matters: admin (role-gated) and the FSM form/response routers with
-# explicit StateFilters take precedence; start/menu handle the rest. The errors
-# router registers the @errors() handler (order-independent for error events).
-router.include_router(errors.router)
+# explicit StateFilters take precedence; start/menu handle the rest.
 router.include_router(admin.router)
 router.include_router(responsible.router)
 router.include_router(submission.router)
 router.include_router(my_submissions.router)
 router.include_router(start.router)
+
+# The error handler must live on the root router (attached to the dispatcher) to
+# fire globally — a leaf sub-router's @errors() would never catch siblings.
+errors.register_errors(router)

@@ -87,12 +87,12 @@ async def harness():
     for mod in (errors, admin, responsible, submission, my_submissions, start):
         importlib.reload(mod)
     root = Router(name="root-test")
-    root.include_router(errors.router)
     root.include_router(admin.router)
     root.include_router(responsible.router)
     root.include_router(submission.router)
     root.include_router(my_submissions.router)
     root.include_router(start.router)
+    errors.register_errors(root)
 
     dp = Dispatcher(storage=MemoryStorage())
     dp.update.outer_middleware(_DbMiddleware(pool))

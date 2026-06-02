@@ -90,8 +90,9 @@ async def env():
     for mod in (errors, admin, responsible, submission, my_submissions, start):
         importlib.reload(mod)
     root = Router(name="root-test")
-    for r in (errors, admin, responsible, submission, my_submissions, start):
+    for r in (admin, responsible, submission, my_submissions, start):
         root.include_router(r.router)
+    errors.register_errors(root)
 
     dp = Dispatcher(storage=MemoryStorage())
     dp.update.outer_middleware(_DbMw(pool, actor_tg_id=500))
@@ -234,3 +235,42 @@ async def test_admin_assign_and_revoke(env):
     async with env.pool() as s:
         t = await s.get(User, target_id)
         assert t.resp_appeal is False
+
+
+@pytest.mark.asyncio
+async def test_global_error_handler_registered_on_root(env):
+    """Regression for the leaf-router @errors() bug: the error handler must be
+    on the ROOT router (attached to the dispatcher), else it never fires."""
+    root = env.dp.sub_routers[0]
+    assert root.errors.handlers, "no global error handler on the root router"
+
+
+@pytest.mark.asyncio
+async def test_close_requires_ownership(env):
+    """A responsible who is NOT the assignee (and not admin) cannot close a
+    submission already claimed by someone else."""
+    # Pre-create the acting officer (tg 500) as a NON-admin responsible so the
+    # _DbMw finds it instead of creating an admin; and a different assignee.
+    async with env.pool() as s:
+        officer = User(
+            tg_id=500, full_name="Officer", is_admin=False,
+            resp_appeal=True, resp_corruption=True, language="ru",
+        )
+        other = User(tg_id=601, resp_appeal=True)
+        s.add_all([officer, other])
+        await s.flush()
+        other_id = other.id
+        await s.commit()
+
+    sub_id = await _make_submission(env.pool, env.settings)
+    async with env.pool() as s:
+        sub = await s.get(Submission, sub_id)
+        sub.status = SubmissionStatus.in_progress
+        sub.assigned_to_user_id = other_id  # claimed by someone else
+        await s.commit()
+
+    await env.dp.feed_update(env.bot, _cb(f"react:close:{sub_id}"))
+
+    async with env.pool() as s:
+        sub = await s.get(Submission, sub_id)
+        assert sub.status == SubmissionStatus.in_progress  # NOT closed

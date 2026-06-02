@@ -158,9 +158,9 @@ async def test_close_idempotent(session):
     )
     await session.commit()
 
-    assert await repo.close(sub.id, user_id=1) is True
+    assert await repo.close(sub.id, user_id=1) == "new"  # prev status returned
     await session.commit()
-    assert await repo.close(sub.id, user_id=2) is False  # already closed
+    assert await repo.close(sub.id, user_id=2) is None  # already closed
     await session.commit()
 
     refreshed = await session.get(Submission, sub.id, populate_existing=True)

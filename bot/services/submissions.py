@@ -175,7 +175,13 @@ class SubmissionService:
     ) -> None:
         """Edit the card at every responsible's chat to reflect a status change,
         removing the action buttons. Resilient to already-deleted messages."""
-        from aiogram.exceptions import TelegramBadRequest
+        import asyncio
+
+        from aiogram.exceptions import (
+            TelegramBadRequest,
+            TelegramForbiddenError,
+            TelegramRetryAfter,
+        )
 
         for d in await self.deliveries_for(sub.id):
             user = await self.session.get(User, d.responsible_user_id)
@@ -185,8 +191,17 @@ class SubmissionService:
                 await bot.edit_message_text(
                     text, chat_id=d.chat_id, message_id=d.message_id, reply_markup=None
                 )
-            except TelegramBadRequest:
-                continue  # message gone / not modified
+            except (TelegramBadRequest, TelegramForbiddenError):
+                continue  # message gone / not modified / bot blocked
+            except TelegramRetryAfter as e:
+                await asyncio.sleep(e.retry_after)
+                # One retry, then give up on this recipient (don't block others).
+                try:
+                    await bot.edit_message_text(
+                        text, chat_id=d.chat_id, message_id=d.message_id, reply_markup=None
+                    )
+                except (TelegramBadRequest, TelegramForbiddenError):
+                    continue
 
     async def resolve_author_chat_id(self, sub: Submission) -> int | None:
         """Return the chat id to deliver a reply, decrypting anon refs in memory."""

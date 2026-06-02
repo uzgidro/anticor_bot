@@ -165,8 +165,13 @@ class SubmissionRepository:
         won = await self.session.scalar(stmt)
         return won is not None
 
-    async def close(self, submission_id: int, user_id: int) -> bool:
-        """Close an open submission. Returns True iff it was open (idempotent)."""
+    async def close(self, submission_id: int, user_id: int) -> str | None:
+        """Close an open submission atomically.
+
+        Returns the PREVIOUS status (for an accurate audit event) if it was open,
+        or None if it was already closed / missing. Capturing the prior status in
+        the same conditional UPDATE avoids a stale read under concurrency.
+        """
         stmt = (
             update(Submission)
             .where(Submission.id == submission_id, Submission.status != SubmissionStatus.closed)
@@ -176,9 +181,17 @@ class SubmissionRepository:
                 closed_at=datetime.now(UTC),
                 updated_at=func.now(),
             )
-            .returning(Submission.id)
+            .returning(Submission.status)
         )
-        return await self.session.scalar(stmt) is not None
+        # RETURNING gives the NEW status; we need the prior one, so read it first
+        # inside the same transaction under the row's visibility.
+        prev = await self.session.scalar(
+            select(Submission.status).where(Submission.id == submission_id)
+        )
+        changed = await self.session.scalar(stmt)
+        if changed is None:
+            return None
+        return prev.value if prev is not None else None
 
     async def add_anon_ref(self, submission_id: int, enc_chat_ref: bytes) -> None:
         self.session.add(

@@ -69,15 +69,18 @@ def create_dispatcher(
         manager=DBLocaleManager(default_locale=settings.default_locale),
     )
 
-    # Outer middleware order is the registration order. Throttling runs FIRST
-    # so flood is rejected before any DB/user work. aiogram's built-in
-    # FSMContextMiddleware runs before all of ours, so the throttle can read
-    # ``state`` to exempt users who are mid-form. DB session and user come next,
-    # then i18n (which needs db_user to resolve the locale).
-    dp.update.outer_middleware(ThrottlingMiddleware(redis=redis))
+    # Outer middleware (registration order): DB session -> user (get-or-create)
+    # -> i18n (needs db_user to resolve locale).
     dp.update.outer_middleware(DbSessionMiddleware(session_pool))
     dp.update.outer_middleware(UserMiddleware(admin_ids=settings.admin_ids))
     i18n_middleware.setup(dispatcher=dp)
+
+    # Throttling is registered on message/callback as INNER middleware so it runs
+    # AFTER aiogram's FSMContextMiddleware — it needs ``state`` in data to exempt
+    # users who are mid-form (their multi-step input must never be dropped).
+    throttle = ThrottlingMiddleware(redis=redis)
+    dp.message.middleware(throttle)
+    dp.callback_query.middleware(throttle)
 
     # Album aggregation only applies to messages.
     dp.message.middleware(MediaGroupMiddleware())

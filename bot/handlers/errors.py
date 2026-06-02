@@ -15,7 +15,16 @@ router = Router(name="errors")
 logger = logging.getLogger("bot.errors")
 
 
-@router.errors()
+def register_errors(root: Router) -> None:
+    """Register the error handler on the ROOT router (attached to the dispatcher).
+
+    A leaf sub-router's @errors() never fires for sibling routers — error events
+    only propagate along the routers that actually handled the update. Binding to
+    the root makes it global.
+    """
+    root.errors.register(on_error)
+
+
 async def on_error(event: ErrorEvent) -> bool:
     update = event.update
     logger.error(
