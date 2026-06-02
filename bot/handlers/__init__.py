@@ -8,9 +8,13 @@ from __future__ import annotations
 
 from aiogram import Router
 
+from bot.handlers import my_submissions, start, submission
+
 router = Router(name="root")
 
-# Sub-routers are included here as they are implemented:
-#   from bot.handlers import start, language, submission, my_submissions,
-#                            responsible, admin, errors
-#   router.include_routers(errors.router, start.router, ...)
+# Order matters: form/submission routers with explicit StateFilters take
+# precedence; start/menu handle the rest. (errors, responsible, admin join in
+# Wave 4.)
+router.include_router(submission.router)
+router.include_router(my_submissions.router)
+router.include_router(start.router)

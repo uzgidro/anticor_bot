@@ -84,6 +84,9 @@ def create_dispatcher(
 
     dp.include_router(root_router)
 
+    # Expose settings to handlers (e.g. anon_enc_key, default_locale).
+    dp["settings"] = settings
+
     async def _on_shutdown() -> None:
         await redis.aclose()
         await engine.dispose()
