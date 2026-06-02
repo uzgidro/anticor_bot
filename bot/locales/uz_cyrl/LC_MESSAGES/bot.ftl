@@ -85,7 +85,7 @@ reply-sent = ✅ Жавоб мурожаатчига юборилди.
 
 # ===== Мурожаатчига жавоб =====
 reply-to-author = 📩 { $public_id } мурожаатингиз бўйича жавоб:
-    .body = { $text }
+reply-to-author-body = { $text }
 submission-closed-notify = ✅ { $public_id } мурожаатингиз ёпилди.
 
 # ===== Администратор =====

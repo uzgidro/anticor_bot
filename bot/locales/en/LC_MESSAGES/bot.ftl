@@ -85,7 +85,7 @@ reply-sent = ✅ The reply has been sent to the applicant.
 
 # ===== Reply to applicant =====
 reply-to-author = 📩 Reply to your submission { $public_id }:
-    .body = { $text }
+reply-to-author-body = { $text }
 submission-closed-notify = ✅ Your submission { $public_id } has been closed.
 
 # ===== Admin =====

@@ -85,7 +85,7 @@ reply-sent = ✅ Javob murojaatchiga yuborildi.
 
 # ===== Murojaatchiga javob =====
 reply-to-author = 📩 { $public_id } murojaatingiz boʻyicha javob:
-    .body = { $text }
+reply-to-author-body = { $text }
 submission-closed-notify = ✅ { $public_id } murojaatingiz yopildi.
 
 # ===== Administrator =====

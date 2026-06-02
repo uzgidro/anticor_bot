@@ -85,7 +85,7 @@ reply-sent = ✅ Juwap múrájátshıǵa jiberildi.
 
 # ===== Múrájátshıǵa juwap =====
 reply-to-author = 📩 { $public_id } múrájátińiz boyınsha juwap:
-    .body = { $text }
+reply-to-author-body = { $text }
 submission-closed-notify = ✅ { $public_id } múrájátińiz jabıldı.
 
 # ===== Administrator =====

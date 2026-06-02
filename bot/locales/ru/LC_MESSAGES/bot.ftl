@@ -85,7 +85,7 @@ reply-sent = ✅ Ответ отправлен заявителю.
 
 # ===== Ответ заявителю =====
 reply-to-author = 📩 Ответ по вашему обращению { $public_id }:
-    .body = { $text }
+reply-to-author-body = { $text }
 submission-closed-notify = ✅ Ваше обращение { $public_id } закрыто.
 
 # ===== Админ =====

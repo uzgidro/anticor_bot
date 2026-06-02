@@ -157,6 +157,37 @@ class SubmissionService:
         await self.session.flush()
         return delivered
 
+    async def deliveries_for(self, submission_id: int):
+        from sqlalchemy import select
+
+        from bot.db.models import SubmissionDelivery
+
+        return list(
+            await self.session.scalars(
+                select(SubmissionDelivery).where(
+                    SubmissionDelivery.submission_id == submission_id
+                )
+            )
+        )
+
+    async def update_all_cards(
+        self, bot: Bot, core: BaseCore, sub: Submission, status_text_key: str, **kw
+    ) -> None:
+        """Edit the card at every responsible's chat to reflect a status change,
+        removing the action buttons. Resilient to already-deleted messages."""
+        from aiogram.exceptions import TelegramBadRequest
+
+        for d in await self.deliveries_for(sub.id):
+            user = await self.session.get(User, d.responsible_user_id)
+            locale = (user.language if user else None) or "ru"
+            text = core.get(status_text_key, locale, **kw)
+            try:
+                await bot.edit_message_text(
+                    text, chat_id=d.chat_id, message_id=d.message_id, reply_markup=None
+                )
+            except TelegramBadRequest:
+                continue  # message gone / not modified
+
     async def resolve_author_chat_id(self, sub: Submission) -> int | None:
         """Return the chat id to deliver a reply, decrypting anon refs in memory."""
         if not sub.is_anonymous:

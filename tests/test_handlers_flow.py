@@ -82,11 +82,14 @@ async def harness():
 
     from aiogram import Router
 
-    from bot.handlers import my_submissions, start, submission
+    from bot.handlers import admin, errors, my_submissions, responsible, start, submission
 
-    for mod in (submission, my_submissions, start):
+    for mod in (errors, admin, responsible, submission, my_submissions, start):
         importlib.reload(mod)
     root = Router(name="root-test")
+    root.include_router(errors.router)
+    root.include_router(admin.router)
+    root.include_router(responsible.router)
     root.include_router(submission.router)
     root.include_router(my_submissions.router)
     root.include_router(start.router)
