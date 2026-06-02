@@ -101,3 +101,8 @@ admin-responsibles-empty = 📭 No responsible persons assigned yet.
 btn-revoke = 🗑 Revoke role
 admin-revoked = ✅ Role revoked.
 new-submission-admin-alert = ⚠️ Submission { $public_id } ({ $type }) arrived, but there are no assigned responsible persons.
+
+# ===== Command menu =====
+cmd-start = Main menu
+cmd-language = Change language
+cmd-cancel = Cancel the current action

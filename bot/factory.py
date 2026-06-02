@@ -87,8 +87,9 @@ def create_dispatcher(
 
     dp.include_router(root_router)
 
-    # Expose settings to handlers (e.g. anon_enc_key, default_locale).
+    # Expose settings and the i18n core to handlers / startup.
     dp["settings"] = settings
+    dp["i18n_core"] = core
 
     async def _on_shutdown() -> None:
         await redis.aclose()

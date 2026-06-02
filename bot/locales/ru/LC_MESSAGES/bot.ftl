@@ -101,3 +101,8 @@ admin-responsibles-empty = 📭 Ответственные ещё не назн�
 btn-revoke = 🗑 Снять роль
 admin-revoked = ✅ Роль снята.
 new-submission-admin-alert = ⚠️ Поступило обращение { $public_id } ({ $type }), но нет назначенных ответственных.
+
+# ===== Команды меню =====
+cmd-start = Главное меню
+cmd-language = Сменить язык
+cmd-cancel = Отменить текущее действие

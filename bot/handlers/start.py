@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from aiogram_i18n import I18nContext
@@ -43,3 +43,12 @@ async def on_language_chosen(
 async def on_change_language(query: CallbackQuery, i18n: I18nContext) -> None:
     await query.message.answer(i18n.get("choose-language"), reply_markup=language_keyboard())
     await query.answer()
+
+
+@router.message(Command("language"))
+async def cmd_language(message: Message, i18n: I18nContext, state: FSMContext) -> None:
+    # Changing language mid-form would desync the UI; ask the user to finish first.
+    if await state.get_state() is not None:
+        await message.answer(i18n.get("language-locked-in-form"))
+        return
+    await message.answer(i18n.get("choose-language"), reply_markup=language_keyboard())

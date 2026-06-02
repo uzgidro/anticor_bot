@@ -101,3 +101,8 @@ admin-responsibles-empty = 📭 Hali masʼul shaxslar biriktirilmagan.
 btn-revoke = 🗑 Rolni olib tashlash
 admin-revoked = ✅ Rol olib tashlandi.
 new-submission-admin-alert = ⚠️ { $public_id } ({ $type }) murojaat keldi, biroq biriktirilgan masʼul shaxslar yoʻq.
+
+# ===== Buyruqlar menyusi =====
+cmd-start = Asosiy menyu
+cmd-language = Tilni oʻzgartirish
+cmd-cancel = Joriy amalni bekor qilish

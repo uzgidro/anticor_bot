@@ -101,3 +101,8 @@ admin-responsibles-empty = 📭 Ҳали масъул шахслар бирик�
 btn-revoke = 🗑 Ролни олиб ташлаш
 admin-revoked = ✅ Рол олиб ташланди.
 new-submission-admin-alert = ⚠️ { $public_id } ({ $type }) мурожаат келди, бироқ бириктирилган масъул шахслар йўқ.
+
+# ===== Буйруқлар менюси =====
+cmd-start = Асосий меню
+cmd-language = Тилни ўзгартириш
+cmd-cancel = Жорий амални бекор қилиш

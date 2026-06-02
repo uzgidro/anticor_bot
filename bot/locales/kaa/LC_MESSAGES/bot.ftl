@@ -101,3 +101,8 @@ admin-responsibles-empty = 📭 Tap házir juwapker shaxslar biriktirilmegen.
 btn-revoke = 🗑 Roldi alıp taslaw
 admin-revoked = ✅ Rol alıp taslandı.
 new-submission-admin-alert = ⚠️ { $public_id } ({ $type }) múráját keldi, biraq biriktirilgen juwapker shaxslar joq.
+
+# ===== Buyrıqlar menyusı =====
+cmd-start = Tiykarǵı menyu
+cmd-language = Tildi ózgertiw
+cmd-cancel = Házirgi háreketti biykarlaw
