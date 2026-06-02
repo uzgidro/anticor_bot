@@ -3,7 +3,15 @@ selection, and dispatch of cards / replies via the bot.
 
 Anonymity enforcement is the security-critical invariant here: for anonymous
 submissions we NEVER store author_user_id / full_name / phone; the author's
-tg_id is kept only encrypted (AnonDeliveryRef), so a DB dump cannot deanonymize.
+tg_id is kept only encrypted (AnonDeliveryRef).
+
+Threat model (be precise): this protects against a DB dump alone — the dump has
+no plaintext author for an anonymous submission. It does NOT make the author
+anonymous to an operator who holds the Fernet key (ANON_ENC_KEY lives outside
+the DB): key + enc_chat_ref -> tg_id, and a `users` row with that tg_id exists
+in cleartext (created by UserMiddleware). There is also a residual timing-
+correlation risk (users.created_at vs submissions.created_at). Mitigations for
+those are tracked in the plan's follow-ups; do not overstate the guarantee.
 """
 from __future__ import annotations
 
@@ -123,8 +131,6 @@ class SubmissionService:
         updated for all). Returns the count delivered. Resilient to blocked bots
         and flood control. Returns 0 if there are no responsibles.
         """
-        from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
-
         from bot.keyboards.inline import reaction_keyboard
 
         responsibles = await self.users.responsibles_for(sub.type)
@@ -133,28 +139,21 @@ class SubmissionService:
             locale = user.language or default_locale
             type_label = core.get(f"type-{sub.type.value}", locale)
             text = render_card(core, locale, sub, type_label)
-            # A localized i18n shim for the keyboard builder.
-            kb_i18n = _LocaleShim(core, locale)
-            try:
-                msg = await bot.send_message(
-                    user.tg_id, text, reply_markup=reaction_keyboard(kb_i18n, sub.id)
-                )
-            except TelegramForbiddenError:
-                continue
-            except TelegramRetryAfter as e:
-                import asyncio
-
-                await asyncio.sleep(e.retry_after)
-                try:
-                    msg = await bot.send_message(
-                        user.tg_id, text, reply_markup=reaction_keyboard(kb_i18n, sub.id)
-                    )
-                except TelegramForbiddenError:
-                    continue
-            self.session.add(
-                _delivery(sub.id, user.id, user.tg_id, msg.message_id)
-            )
-            delivered += 1
+            kb = reaction_keyboard(_LocaleShim(core, locale), sub.id)
+            parts = split_text(text)
+            # Send leading chunks without buttons; the final chunk carries them.
+            ok = True
+            last_message_id = None
+            for i, part in enumerate(parts):
+                markup = kb if i == len(parts) - 1 else None
+                sent = await _send_with_retry(bot, user.tg_id, part, markup)
+                if sent is None:
+                    ok = False
+                    break
+                last_message_id = sent.message_id
+            if ok and last_message_id is not None:
+                self.session.add(_delivery(sub.id, user.id, user.tg_id, last_message_id))
+                delivered += 1
         await self.session.flush()
         return delivered
 
@@ -184,6 +183,20 @@ def render_card(core: BaseCore, locale: str, sub: Submission, type_label: str) -
             lines.append(core.get("card-phone", locale, phone=escape(sub.phone)))
     lines.append(core.get("card-text", locale, text=escape(sub.text)))
     return "\n".join(lines)
+
+
+async def _send_with_retry(bot: Bot, chat_id: int, text: str, reply_markup=None):
+    """Send one message, retrying once on flood control, None if bot is blocked."""
+    import asyncio
+
+    for _attempt in range(2):
+        try:
+            return await bot.send_message(chat_id, text, reply_markup=reply_markup)
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after)
+        except TelegramForbiddenError:
+            return None
+    return None
 
 
 async def safe_send(bot: Bot, chat_id: int, text: str, **kwargs) -> bool:

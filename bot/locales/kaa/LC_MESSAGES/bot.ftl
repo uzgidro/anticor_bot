@@ -10,8 +10,7 @@ cancelled = ❌ Háreket biykarlandı.
 throttled = ⏳ Sorawlar júdá kóp. Azǵantay kútiń.
 
 # ===== Tiykarǵı menyu =====
-main-menu = 👋 Assalawma aleykum! Bul “Ózbekgidroenergo” AJ boti.
-    .subtitle = Ne islewdi qálegenińizdi saylań:
+main-menu = 👋 Assalawma aleykum! Bul “Ózbekgidroenergo” AJ boti. Ne islewdi qálegenińizdi saylań:
 btn-appeal = 📝 Puqaralar múrájáti
 btn-corruption = 🛡 Korrupciya ústinen shaǵım
 btn-my-submissions = 📋 Meniń múrájátlerim
@@ -19,13 +18,14 @@ btn-change-language = 🌐 Tildi ózgertiw
 
 # ===== Forma =====
 form-anonymous-ask = 🕵 Shaǵımdı anonim túrde jibermekshimisiz?
-    .warning = ⚠️ Dıqqat: tirkelgen fayllar (súwret/hújjet) shaxsińizdi ashıp qoyıwı múmkin bolǵan maǵlıwmatlardı (mısalı, metamaǵlıwmatlardı) óz ishine alıwı múmkin.
+form-anonymous-warning = ⚠️ Dıqqat: tirkelgen fayllar (súwret/hújjet) shaxsińizdi ashıp qoyıwı múmkin bolǵan maǵlıwmatlardı (mısalı, metamaǵlıwmat/EXIF) óz ishine alıwı múmkin. Anonimlik — bot atıńız hám baylanıs maǵlıwmatlarıńızdı saqlamaydı hám kórsetpeydi degeni, biraq olardı tekstte de kórsetpeń.
 btn-yes = ✅ Awa
 btn-no = ❌ Yaq
 form-ask-name = 👤 Atı-jónińizdi kiritiń:
 form-ask-phone = 📞 Telefon nomerińizdi kiritiń yamasa kontaktıńızdı bólisiń:
 btn-share-contact = 📲 Kontakttı bólisiw
 form-ask-text = ✍️ Múrájátińizdi bayanlań:
+form-text-anon-hint = 🔒 Tekstte atıńızdı, telefonıńızdı yamasa sizdi anıqlaw múmkin bolǵan maǵlıwmatlardı kórsetpeń.
 form-ask-attachments = 📎 Súwret yamasa hújjet tirkeń (qálewińiz boyınsha) hám “Tayın” túymesin basıń yamasa “Ótkizip jiberiw”.
 form-attachment-added = 📎 Tirkeme qosıldı ({ $count }). Taǵı qosıń yamasa “Tayın” túymesin basıń.
 form-invalid-text = ⚠️ Iltimas, tekst túrinde jiberiń.
@@ -46,8 +46,8 @@ form-confirm-cancel = Biykarlawdı qáleysizbe? Kiritilgen maǵlıwmatlar joǵal
 
 # ===== Jiberilgennen keyin =====
 submission-accepted = ✅ Múrájátińiz ushın raxmet!
-    .ticket = Múrájátińiz nomeri: { $public_id }
-    .note = Jaqın arada kórip shıǵamız.
+submission-accepted-ticket = Múrájátińiz nomeri: { $public_id }
+submission-accepted-note = Jaqın arada kórip shıǵamız.
 submission-accepted-no-responsible = ✅ Múrájátińiz ushın raxmet! Nomeri: { $public_id }. Ol qabıllandı hám jaqın arada juwapker shaxsqa biriktiriledi.
 
 # ===== Meniń múrájátlerim =====

@@ -10,8 +10,7 @@ cancelled = ❌ Amal bekor qilindi.
 throttled = ⏳ Soʻrovlar juda koʻp. Biroz kuting.
 
 # ===== Asosiy menyu =====
-main-menu = 👋 Assalomu alaykum! Bu “Oʻzbekgidroenergo” AJ boti.
-    .subtitle = Nima qilmoqchi ekaningizni tanlang:
+main-menu = 👋 Assalomu alaykum! Bu “Oʻzbekgidroenergo” AJ boti. Nima qilmoqchi ekaningizni tanlang:
 btn-appeal = 📝 Fuqarolar murojaati
 btn-corruption = 🛡 Korrupsiya ustidan shikoyat
 btn-my-submissions = 📋 Mening murojaatlarim
@@ -19,13 +18,14 @@ btn-change-language = 🌐 Tilni oʻzgartirish
 
 # ===== Shakl =====
 form-anonymous-ask = 🕵 Shikoyatni anonim tarzda yubormoqchimisiz?
-    .warning = ⚠️ Diqqat: ilova qilingan fayllar (rasm/hujjat) shaxsingizni oshkor qiluvchi maʼlumotlarni (masalan, metamaʼlumotlarni) oʻz ichiga olishi mumkin.
+form-anonymous-warning = ⚠️ Diqqat: ilova qilingan fayllar (rasm/hujjat) shaxsingizni oshkor qiluvchi maʼlumotlarni (masalan, metamaʼlumot/EXIF) oʻz ichiga olishi mumkin. Anonimlik — bot ismingiz va aloqa maʼlumotlaringizni saqlamaydi va koʻrsatmaydi degani, lekin ularni matnda ham koʻrsatmang.
 btn-yes = ✅ Ha
 btn-no = ❌ Yoʻq
 form-ask-name = 👤 F.I.Sh. ni kiriting:
 form-ask-phone = 📞 Telefon raqamingizni kiriting yoki kontaktingizni ulashing:
 btn-share-contact = 📲 Kontaktni ulashish
 form-ask-text = ✍️ Murojaatingizni bayon qiling:
+form-text-anon-hint = 🔒 Matnda ismingiz, telefoningiz yoki sizni aniqlash mumkin boʻlgan maʼlumotlarni koʻrsatmang.
 form-ask-attachments = 📎 Rasm yoki hujjat ilova qiling (ixtiyoriy) va “Tayyor” tugmasini bosing yoki “Oʻtkazib yuborish”.
 form-attachment-added = 📎 Ilova qoʻshildi ({ $count }). Yana qoʻshing yoki “Tayyor” tugmasini bosing.
 form-invalid-text = ⚠️ Iltimos, matn koʻrinishida yuboring.
@@ -46,8 +46,8 @@ form-confirm-cancel = Bekor qilishni xohlaysizmi? Kiritilgan maʼlumotlar yoʻqo
 
 # ===== Yuborilgandan keyin =====
 submission-accepted = ✅ Murojaatingiz uchun rahmat!
-    .ticket = Murojaatingiz raqami: { $public_id }
-    .note = Tez orada koʻrib chiqamiz.
+submission-accepted-ticket = Murojaatingiz raqami: { $public_id }
+submission-accepted-note = Tez orada koʻrib chiqamiz.
 submission-accepted-no-responsible = ✅ Murojaatingiz uchun rahmat! Raqami: { $public_id }. U qabul qilindi va tez orada masʼul shaxsga biriktiriladi.
 
 # ===== Mening murojaatlarim =====

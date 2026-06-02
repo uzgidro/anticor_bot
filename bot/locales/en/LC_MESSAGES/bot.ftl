@@ -10,8 +10,7 @@ cancelled = ❌ Action cancelled.
 throttled = ⏳ Too many requests. Please wait a moment.
 
 # ===== Main menu =====
-main-menu = 👋 Hello! This is the bot of JSC Uzbekgidroenergo.
-    .subtitle = Please choose what you would like to do:
+main-menu = 👋 Hello! This is the bot of JSC Uzbekgidroenergo. Please choose what you would like to do:
 btn-appeal = 📝 Citizen appeal
 btn-corruption = 🛡 Corruption complaint
 btn-my-submissions = 📋 My submissions
@@ -19,13 +18,14 @@ btn-change-language = 🌐 Change language
 
 # ===== Form =====
 form-anonymous-ask = 🕵 Would you like to submit the complaint anonymously?
-    .warning = ⚠️ Note: attachments (photos/documents) may contain data that reveals your identity (e.g. metadata).
+form-anonymous-warning = ⚠️ Note: attachments (photos/documents) may contain data that reveals your identity (e.g. metadata/EXIF). Anonymous means the bot won't store or show your name and contacts — but do not include them in the text either.
 btn-yes = ✅ Yes
 btn-no = ❌ No
 form-ask-name = 👤 Please enter your full name:
 form-ask-phone = 📞 Please enter your phone number or share your contact:
 btn-share-contact = 📲 Share contact
 form-ask-text = ✍️ Please describe your submission:
+form-text-anon-hint = 🔒 Do not include your name, phone or any data that could identify you in the text.
 form-ask-attachments = 📎 Attach photos or documents (optional) and tap "Done", or "Skip".
 form-attachment-added = 📎 Attachment added ({ $count }). Add more or tap "Done".
 form-invalid-text = ⚠️ Please send it as text.
@@ -46,8 +46,8 @@ form-confirm-cancel = Are you sure you want to cancel? Your entered data will be
 
 # ===== After submit =====
 submission-accepted = ✅ Thank you for your submission!
-    .ticket = Your submission number: { $public_id }
-    .note = We will review it shortly.
+submission-accepted-ticket = Your submission number: { $public_id }
+submission-accepted-note = We will review it shortly.
 submission-accepted-no-responsible = ✅ Thank you for your submission! Number: { $public_id }. It has been accepted and will be assigned to a responsible officer soon.
 
 # ===== My submissions =====

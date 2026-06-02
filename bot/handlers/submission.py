@@ -26,7 +26,7 @@ from bot.services.submissions import (
     SubmissionInput,
     SubmissionService,
 )
-from bot.utils.text import MAX_INPUT_LEN, escape
+from bot.utils.text import MAX_INPUT_LEN, escape, split_text
 
 router = Router(name="submission")
 
@@ -44,7 +44,7 @@ async def start_form(
     if type_ == SubmissionType.corruption:
         await state.set_state(SubmissionForm.anonymous)
         await query.message.answer(
-            f"{i18n.get('form-anonymous-ask')}\n{i18n.get('form-anonymous-ask', 'warning')}",
+            f"{i18n.get('form-anonymous-ask')}\n{i18n.get('form-anonymous-warning')}",
             reply_markup=anon_keyboard(i18n),
         )
     else:
@@ -79,7 +79,11 @@ async def _ask_phone(message: Message, state: FSMContext, i18n: I18nContext) -> 
 
 async def _ask_text(message: Message, state: FSMContext, i18n: I18nContext) -> None:
     await state.set_state(SubmissionForm.text)
-    await message.answer(i18n.get("form-ask-text"), reply_markup=nav_keyboard(i18n))
+    data = await state.get_data()
+    prompt = i18n.get("form-ask-text")
+    if data.get("is_anonymous"):
+        prompt = f"{prompt}\n{i18n.get('form-text-anon-hint')}"
+    await message.answer(prompt, reply_markup=nav_keyboard(i18n))
 
 
 async def _ask_attachments(message: Message, state: FSMContext, i18n: I18nContext) -> None:
@@ -151,6 +155,12 @@ async def on_attachment(
     )
 
 
+@router.message(SubmissionForm.attachments)
+async def on_attachment_invalid(message: Message, i18n: I18nContext) -> None:
+    # Non-photo/document input at the attachments step: guide, don't get stuck.
+    await message.answer(i18n.get("form-ask-attachments"))
+
+
 # ---------- navigation ----------
 
 @router.callback_query(StateFilter(SubmissionForm), FormCb.filter(F.action == "cancel"))
@@ -186,7 +196,7 @@ async def on_back(query: CallbackQuery, state: FSMContext, i18n: I18nContext) ->
         if is_anon:
             await state.set_state(SubmissionForm.anonymous)
             await msg.answer(
-                f"{i18n.get('form-anonymous-ask')}\n{i18n.get('form-anonymous-ask', 'warning')}",
+                f"{i18n.get('form-anonymous-ask')}\n{i18n.get('form-anonymous-warning')}",
                 reply_markup=anon_keyboard(i18n),
             )
         else:
@@ -213,7 +223,11 @@ async def _show_confirm(message: Message, state: FSMContext, i18n: I18nContext) 
     lines.append(i18n.get("form-summary-text", text=escape(data.get("text", ""))))
     lines.append(i18n.get("form-summary-attachments", count=len(data.get("attachments", []))))
     await state.set_state(SubmissionForm.confirm)
-    await message.answer("\n".join(lines), reply_markup=confirm_keyboard(i18n))
+    summary = "\n".join(lines)
+    parts = split_text(summary)
+    for part in parts[:-1]:
+        await message.answer(part)
+    await message.answer(parts[-1], reply_markup=confirm_keyboard(i18n))
 
 
 @router.callback_query(SubmissionForm.confirm, FormCb.filter(F.action == "submit"))
@@ -248,18 +262,26 @@ async def on_submit(
     )
     await state.clear()
 
+    # Commit BEFORE any network fan-out: responsibles must never receive a card
+    # for a submission that a later rollback would erase. Capture ids first
+    # (the instance may expire after commit).
+    public_id = sub.public_id
+    await session.commit()
+
     delivered = await svc.dispatch_to_responsibles(
         query.bot, i18n.core, sub, default_locale=settings.default_locale
     )
+    await session.commit()  # persist SubmissionDelivery rows
+
     if delivered:
         await query.message.answer(
             f"{i18n.get('submission-accepted')}\n"
-            f"{i18n.get('submission-accepted', 'ticket', public_id=sub.public_id)}\n"
-            f"{i18n.get('submission-accepted', 'note')}"
+            f"{i18n.get('submission-accepted-ticket', public_id=public_id)}\n"
+            f"{i18n.get('submission-accepted-note')}"
         )
     else:
         await query.message.answer(
-            i18n.get("submission-accepted-no-responsible", public_id=sub.public_id)
+            i18n.get("submission-accepted-no-responsible", public_id=public_id)
         )
         await _alert_admins_no_responsible(query.bot, svc, i18n, sub, settings)
     await query.answer()

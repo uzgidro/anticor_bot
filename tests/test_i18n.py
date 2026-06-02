@@ -56,3 +56,26 @@ async def test_core_loads_and_explicit_locale_lookup():
     for loc in LOCALES:
         text = core.get("btn-cancel", loc)
         assert isinstance(text, str) and text
+
+
+@pytest.mark.asyncio
+async def test_critical_keys_resolve_distinctly():
+    """Regression: these were Fluent attributes accessed via a wrong API, which
+    silently returned the message body. They must now be standalone keys that
+    resolve to distinct, parametrized strings in every locale."""
+    from aiogram_i18n.cores.fluent_runtime_core import FluentRuntimeCore
+
+    core = FluentRuntimeCore(path=str(LOCALES_DIR / "{locale}" / "LC_MESSAGES"))
+    await core.startup()
+    for loc in LOCALES:
+        ask = core.get("form-anonymous-ask", loc)
+        warning = core.get("form-anonymous-warning", loc)
+        assert ask != warning, f"{loc}: warning must differ from the question"
+
+        accepted = core.get("submission-accepted", loc)
+        ticket = core.get("submission-accepted-ticket", loc, public_id="ABC123")
+        assert ticket != accepted
+        assert "ABC123" in ticket  # the ticket number is actually shown
+
+        hint = core.get("form-text-anon-hint", loc)
+        assert hint and hint != core.get("form-ask-text", loc)
