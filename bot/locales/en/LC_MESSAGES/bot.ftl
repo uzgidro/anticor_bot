@@ -1,0 +1,103 @@
+# ===== Common =====
+choose-language = 🌐 Выберите язык / Тилни танланг / Tilni tanlang / Tildi saylañ / Choose a language
+language-set = ✅ Language set: English
+error-generic = ⚠️ An error occurred. Please try again later.
+btn-back = ◀️ Back
+btn-cancel = ❌ Cancel
+btn-skip = ⏭️ Skip
+btn-done = ✅ Done
+cancelled = ❌ Action cancelled.
+throttled = ⏳ Too many requests. Please wait a moment.
+
+# ===== Main menu =====
+main-menu = 👋 Hello! This is the bot of JSC Uzbekgidroenergo.
+    .subtitle = Please choose what you would like to do:
+btn-appeal = 📝 Citizen appeal
+btn-corruption = 🛡 Corruption complaint
+btn-my-submissions = 📋 My submissions
+btn-change-language = 🌐 Change language
+
+# ===== Form =====
+form-anonymous-ask = 🕵 Would you like to submit the complaint anonymously?
+    .warning = ⚠️ Note: attachments (photos/documents) may contain data that reveals your identity (e.g. metadata).
+btn-yes = ✅ Yes
+btn-no = ❌ No
+form-ask-name = 👤 Please enter your full name:
+form-ask-phone = 📞 Please enter your phone number or share your contact:
+btn-share-contact = 📲 Share contact
+form-ask-text = ✍️ Please describe your submission:
+form-ask-attachments = 📎 Attach photos or documents (optional) and tap "Done", or "Skip".
+form-attachment-added = 📎 Attachment added ({ $count }). Add more or tap "Done".
+form-invalid-text = ⚠️ Please send it as text.
+form-empty-text = ⚠️ The text cannot be empty. Please try again.
+form-invalid-phone = ⚠️ That doesn't look like a phone number. Enter it or share your contact.
+form-too-long = ⚠️ The text is too long (max { $max } characters). Please shorten it.
+
+# ===== Confirmation =====
+form-summary = 📋 Please review your submission:
+form-summary-type = Type: { $type }
+form-summary-name = Full name: { $name }
+form-summary-phone = Phone: { $phone }
+form-summary-anonymous = 🕵 Anonymous
+form-summary-text = Text: { $text }
+form-summary-attachments = Attachments: { $count }
+btn-submit = ✅ Submit
+form-confirm-cancel = Are you sure you want to cancel? Your entered data will be lost.
+
+# ===== After submit =====
+submission-accepted = ✅ Thank you for your submission!
+    .ticket = Your submission number: { $public_id }
+    .note = We will review it shortly.
+submission-accepted-no-responsible = ✅ Thank you for your submission! Number: { $public_id }. It has been accepted and will be assigned to a responsible officer soon.
+
+# ===== My submissions =====
+my-submissions-empty = 📭 You have no submissions yet.
+my-submissions-title = 📋 Your submissions:
+my-submission-item = { $public_id } — { $type } — { $status }
+
+# ===== Types and statuses =====
+type-appeal = Citizen appeal
+type-corruption = Corruption complaint
+status-new = 🆕 New
+status-in_progress = 🟡 In progress
+status-closed = ✅ Closed
+
+# ===== Language change inside form =====
+language-locked-in-form = ⚠️ Please finish or cancel your current submission first.
+
+# ===== Responsible person card =====
+card-title = 📨 New submission { $public_id }
+card-type = Type: { $type }
+card-from = From: { $name }
+card-phone = Phone: { $phone }
+card-anonymous = 🕵 Anonymous submission
+card-text = Text: { $text }
+card-status = Status: { $status }
+card-assigned = 🟡 In progress by { $name }
+btn-take = 🟡 Take in progress
+btn-reply = ✍️ Reply
+btn-close = ✅ Close
+cb-already-taken = ⚠️ Already in progress by { $name }
+cb-taken = ✅ You took this submission.
+cb-closed = ✅ Submission closed.
+reply-ask = ✍️ Enter the reply text for the applicant:
+reply-sent = ✅ The reply has been sent to the applicant.
+
+# ===== Reply to applicant =====
+reply-to-author = 📩 Reply to your submission { $public_id }:
+    .body = { $text }
+submission-closed-notify = ✅ Your submission { $public_id } has been closed.
+
+# ===== Admin =====
+admin-only = ⛔ This command is for administrators only.
+admin-assign-usage = Usage: forward a user's message or provide their ID, then choose the type.
+admin-assign-choose-type = Choose the responsibility type for the user:
+btn-resp-appeal = 📝 Responsible for appeals
+btn-resp-corruption = 🛡 Responsible for complaints
+admin-assigned = ✅ Role assigned to user { $user }.
+admin-no-responsibles = ⚠️ No responsible persons for type "{ $type }". Assign them with /assign.
+admin-responsibles-title = 👥 Responsible persons:
+admin-responsibles-empty = 📭 No responsible persons assigned yet.
+btn-revoke = 🗑 Revoke role
+admin-revoked = ✅ Role revoked.
+new-submission-admin-alert = ⚠️ Submission { $public_id } ({ $type }) arrived, but there are no assigned responsible persons.

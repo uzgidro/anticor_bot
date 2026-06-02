@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LOCALES: tuple[str, ...] = ("ru", "kaa", "uz_cyrl", "uz_latn", "en")
@@ -80,6 +80,17 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return {int(x.strip()) for x in v.split(",") if x.strip()}
         return v
+
+    @model_validator(mode="after")
+    def _validate_webhook(self) -> Settings:
+        if self.use_webhook:
+            if not self.webhook_url or self.webhook_url == "https://example.com":
+                raise ValueError("WEBHOOK_URL must be set when USE_WEBHOOK=true")
+            if not self.webhook_url.startswith("https://"):
+                raise ValueError("WEBHOOK_URL must be HTTPS")
+            if not self.webhook_secret.get_secret_value():
+                raise ValueError("WEBHOOK_SECRET must be set when USE_WEBHOOK=true")
+        return self
 
     @property
     def webhook_full_url(self) -> str:
