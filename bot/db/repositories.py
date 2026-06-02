@@ -11,11 +11,13 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
     AnonDeliveryRef,
+    AttachmentType,
     AuditLog,
     Submission,
     SubmissionAttachment,
@@ -49,7 +51,16 @@ class UserRepository:
             return user, False
         user = User(tg_id=tg_id, username=username, full_name=full_name)
         self.session.add(user)
-        await self.session.flush()
+        try:
+            await self.session.flush()
+        except IntegrityError:
+            # Concurrent creation of the same tg_id: roll back our insert and
+            # re-read the row the other transaction committed.
+            await self.session.rollback()
+            existing = await self.get_by_tg_id(tg_id)
+            if existing is None:
+                raise
+            return existing, False
         return user, True
 
     async def set_language(self, user: User, language: str) -> None:
@@ -77,7 +88,7 @@ class SubmissionRepository:
         ``ON CONFLICT`` upsert.
         """
         type_value = type_.value
-        dialect = self.session.bind.dialect.name if self.session.bind else "sqlite"
+        dialect = self.session.get_bind().dialect.name
         if dialect == "postgresql":
             from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -125,7 +136,9 @@ class SubmissionRepository:
         await self.session.flush()
         return sub
 
-    async def add_attachment(self, submission_id: int, file_id: str, file_type, order: int) -> None:
+    async def add_attachment(
+        self, submission_id: int, file_id: str, file_type: AttachmentType, order: int
+    ) -> None:
         self.session.add(
             SubmissionAttachment(
                 submission_id=submission_id, file_id=file_id, file_type=file_type, order=order
@@ -134,32 +147,38 @@ class SubmissionRepository:
         await self.session.flush()
 
     async def try_claim(self, submission_id: int, user_id: int) -> bool:
-        """Atomically move new -> in_progress. Returns True iff this caller won."""
+        """Atomically move new -> in_progress. Returns True iff this caller won.
+
+        The conditional UPDATE bypasses the ORM flush, so updated_at is bumped
+        explicitly here (onupdate would not fire on a Core UPDATE).
+        """
         stmt = (
             update(Submission)
             .where(Submission.id == submission_id, Submission.status == SubmissionStatus.new)
-            .values(status=SubmissionStatus.in_progress, assigned_to_user_id=user_id)
+            .values(
+                status=SubmissionStatus.in_progress,
+                assigned_to_user_id=user_id,
+                updated_at=func.now(),
+            )
             .returning(Submission.id)
         )
         won = await self.session.scalar(stmt)
-        # The bulk UPDATE bypasses the ORM; expire any cached instance so a
-        # subsequent get() reflects the new status/assignee.
-        cached = await self.session.get(Submission, submission_id)
-        if cached is not None:
-            await self.session.refresh(cached)
         return won is not None
 
-    async def close(self, submission_id: int, user_id: int) -> None:
+    async def close(self, submission_id: int, user_id: int) -> bool:
+        """Close an open submission. Returns True iff it was open (idempotent)."""
         stmt = (
             update(Submission)
-            .where(Submission.id == submission_id)
+            .where(Submission.id == submission_id, Submission.status != SubmissionStatus.closed)
             .values(
                 status=SubmissionStatus.closed,
                 closed_by_user_id=user_id,
                 closed_at=datetime.now(UTC),
+                updated_at=func.now(),
             )
+            .returning(Submission.id)
         )
-        await self.session.execute(stmt)
+        return await self.session.scalar(stmt) is not None
 
     async def add_anon_ref(self, submission_id: int, enc_chat_ref: bytes) -> None:
         self.session.add(

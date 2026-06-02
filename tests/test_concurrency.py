@@ -99,3 +99,19 @@ async def test_concurrent_ticket_numbers_unique(pg_pool):
 
     nums = await asyncio.gather(*[gen() for _ in range(25)])
     assert len(set(nums)) == len(nums)  # no duplicates under concurrency
+
+
+@pytest.mark.asyncio
+async def test_concurrent_get_or_create_same_tg_id(pg_pool):
+    """Two concurrent get_or_create for one tg_id must not raise; one row only."""
+    from bot.db.repositories import UserRepository
+
+    async def make() -> int:
+        async with pg_pool() as s:
+            u, _ = await UserRepository(s).get_or_create(tg_id=777, username="x")
+            await s.commit()
+            return u.id
+
+    results = await asyncio.gather(*[make() for _ in range(8)], return_exceptions=True)
+    assert all(not isinstance(r, Exception) for r in results), results
+    assert len(set(results)) == 1  # all resolved to the same user row

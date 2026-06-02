@@ -1,7 +1,7 @@
 """Tests for bot.db.repositories — CRUD, ticket generation, atomic claim."""
 import pytest
 
-from bot.db.models import SubmissionStatus, SubmissionType
+from bot.db.models import Submission, SubmissionStatus, SubmissionType
 
 
 @pytest.mark.asyncio
@@ -112,6 +112,97 @@ async def test_atomic_claim_success_then_fail(session):
     await session.commit()
     assert won_second is False  # already in_progress
 
-    refreshed = await repo.get(sub.id)
+    # Core UPDATE bypassed the ORM identity map; force a fresh load.
+    refreshed = await session.get(Submission, sub.id, populate_existing=True)
     assert refreshed.status == SubmissionStatus.in_progress
     assert refreshed.assigned_to_user_id == 10
+
+
+@pytest.mark.asyncio
+async def test_anon_ref_roundtrip(session):
+    from bot.db.repositories import SubmissionRepository
+
+    repo = SubmissionRepository(session)
+    sub = await repo.create(
+        type=SubmissionType.corruption, text="t", is_anonymous=True,
+        public_id="AN1", ticket_number="COR-2026-0050",
+    )
+    await session.flush()
+    await repo.add_anon_ref(sub.id, b"encrypted-blob")
+    await session.commit()
+
+    assert await repo.get_anon_ref(sub.id) == b"encrypted-blob"
+
+
+@pytest.mark.asyncio
+async def test_get_anon_ref_none_when_absent(session):
+    from bot.db.repositories import SubmissionRepository
+
+    repo = SubmissionRepository(session)
+    sub = await repo.create(
+        type=SubmissionType.appeal, text="t", is_anonymous=False,
+        public_id="NOREF", ticket_number="OBR-2026-0051",
+    )
+    await session.commit()
+    assert await repo.get_anon_ref(sub.id) is None
+
+
+@pytest.mark.asyncio
+async def test_close_idempotent(session):
+    from bot.db.repositories import SubmissionRepository
+
+    repo = SubmissionRepository(session)
+    sub = await repo.create(
+        type=SubmissionType.appeal, text="t", is_anonymous=False,
+        public_id="CL1", ticket_number="OBR-2026-0052",
+    )
+    await session.commit()
+
+    assert await repo.close(sub.id, user_id=1) is True
+    await session.commit()
+    assert await repo.close(sub.id, user_id=2) is False  # already closed
+    await session.commit()
+
+    refreshed = await session.get(Submission, sub.id, populate_existing=True)
+    assert refreshed.status == SubmissionStatus.closed
+    assert refreshed.closed_by_user_id == 1
+    assert refreshed.closed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_try_claim_missing_submission(session):
+    from bot.db.repositories import SubmissionRepository
+
+    repo = SubmissionRepository(session)
+    assert await repo.try_claim(999999, user_id=1) is False
+
+
+@pytest.mark.asyncio
+async def test_ticket_counters_independent_matrix(session):
+    """Three (type, year) counters must advance independently when interleaved."""
+    from bot.db.repositories import SubmissionRepository
+
+    repo = SubmissionRepository(session)
+    a1 = await repo.next_ticket_number(SubmissionType.appeal, year=2025)
+    c1 = await repo.next_ticket_number(SubmissionType.corruption, year=2025)
+    a2026 = await repo.next_ticket_number(SubmissionType.appeal, year=2026)
+    a2 = await repo.next_ticket_number(SubmissionType.appeal, year=2025)
+    await session.commit()
+    assert a1 == "OBR-2025-0001"
+    assert c1 == "COR-2025-0001"
+    assert a2026 == "OBR-2026-0001"
+    assert a2 == "OBR-2025-0002"
+
+
+@pytest.mark.asyncio
+async def test_audit_log(session):
+    from sqlalchemy import select
+
+    from bot.db.models import AuditLog
+    from bot.db.repositories import AuditRepository
+
+    await AuditRepository(session).log(action="assign_role", actor_user_id=1, target="user:5")
+    await session.commit()
+    rows = list(await session.scalars(select(AuditLog)))
+    assert len(rows) == 1
+    assert rows[0].action == "assign_role"

@@ -22,8 +22,18 @@ class AnonCipher:
         except (ValueError, TypeError) as exc:
             raise ValueError("ANON_ENC_KEY is not a valid Fernet key") from exc
 
-    def encrypt_chat_id(self, tg_id: int) -> bytes:
-        return self._fernet.encrypt(str(tg_id).encode())
+    def encrypt_chat_id(self, tg_id: int, submission_id: int) -> bytes:
+        """Encrypt an anonymous author's tg_id, bound to its submission.
 
-    def decrypt_chat_id(self, token: bytes) -> int:
-        return int(self._fernet.decrypt(token).decode())
+        The submission_id is baked into the plaintext as a poor-man's AAD: a
+        token cannot be moved to another submission's row without detection,
+        because decrypt verifies the bound submission_id.
+        """
+        return self._fernet.encrypt(f"{submission_id}:{tg_id}".encode())
+
+    def decrypt_chat_id(self, token: bytes, submission_id: int) -> int:
+        raw = self._fernet.decrypt(token).decode()
+        bound_id, _, tg = raw.partition(":")
+        if not tg or int(bound_id) != submission_id:
+            raise ValueError("anon chat-ref does not match its submission")
+        return int(tg)
