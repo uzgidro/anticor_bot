@@ -1,0 +1,157 @@
+name: CI/CD Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # Concurrency-sensitive tests (atomic claim, ticket-counter races) run
+      # against real Postgres. See tests/test_concurrency.py — it reads TEST_PG_DSN.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: anticor
+          POSTGRES_PASSWORD: anticor
+          POSTGRES_DB: anticor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U anticor"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check bot tests
+
+      - name: Run tests
+        env:
+          TEST_PG_DSN: postgresql+asyncpg://anticor:anticor@localhost:5432/anticor_test
+        run: pytest -q
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      sha8: ${{ steps.slug.outputs.sha8 }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Get Short SHA
+        id: slug
+        run: echo "sha8=$(echo ${GITHUB_SHA} | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          pull: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/anticor-bot:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/anticor-bot:${{ steps.slug.outputs.sha8 }}
+
+  verify-image:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    outputs:
+      sha8: ${{ needs.build-and-push.outputs.sha8 }}
+      scan-failed: ${{ steps.trivy.outcome == 'failure' }}
+
+    steps:
+      - name: Run Trivy vulnerability scan
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/anticor-bot:${{ needs.build-and-push.outputs.sha8 }}
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+  rebuild-no-cache:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, verify-image]
+    if: needs.verify-image.outputs.scan-failed == 'true'
+    outputs:
+      sha8: ${{ needs.build-and-push.outputs.sha8 }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Rebuild without cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          pull: true
+          no-cache: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/anticor-bot:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/anticor-bot:${{ needs.build-and-push.outputs.sha8 }}
+
+      - name: Re-scan with Trivy
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/anticor-bot:${{ needs.build-and-push.outputs.sha8 }}
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+  # Watchtower on the web-panel server polls/accepts this trigger and pulls the
+  # freshly pushed image, recreating the single bot container. Set up the bot
+  # container once by hand; every push to main updates it from here on.
+  trigger-watchtower:
+    runs-on: ubuntu-latest
+    needs: [verify-image, rebuild-no-cache]
+    if: |
+      always() &&
+      (needs.verify-image.outputs.scan-failed != 'true' || needs.rebuild-no-cache.result == 'success')
+    steps:
+      - name: Trigger Watchtower Update
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.WATCHTOWER_SECRET }}" \
+            https://${{ secrets.WATCHTOWER_HOST }}/v1/update

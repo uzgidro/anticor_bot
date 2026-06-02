@@ -41,6 +41,27 @@ Python 3.11+, aiogram 3.x, aiogram-i18n + Fluent, PostgreSQL (SQLAlchemy 2.0 asy
 
 > Образ запускает **один долгоживущий процесс** и не публикует портов (для webhook TLS терминируйте на reverse-proxy панели). Никакого отдельного «migrate»-шага не требуется.
 
+## CI/CD (GitHub Actions)
+
+`.github/workflows/deploy.yml` на каждый push в `main`:
+
+1. **test** — `ruff` + `pytest` (с сервисным Postgres; конкурентные тесты идут против реальной БД через `TEST_PG_DSN`).
+2. **build-and-push** — сборка Docker-образа и пуш в Docker Hub с тегами `latest` и `:<sha8>` (кэш через GitHub Actions).
+3. **verify-image** — скан образа Trivy (CRITICAL/HIGH, fixed-only).
+4. **rebuild-no-cache** — если скан нашёл уязвимости, пересборка без кэша и повторный скан.
+5. **trigger-watchtower** — дёргает Watchtower на сервере, тот подтягивает свежий образ и пересоздаёт контейнер бота.
+
+**Деплой:** первый раз контейнер бота создаётся на панели **вручную** (см. «Деплой на веб-панели»); дальше каждый push в `main` обновляет его автоматически через Watchtower.
+
+Нужные **GitHub Secrets**:
+
+| Secret | Назначение |
+| --- | --- |
+| `DOCKERHUB_USERNAME` | логин Docker Hub (он же префикс имени образа `…/anticor-bot`) |
+| `DOCKERHUB_TOKEN` | access-token Docker Hub |
+| `WATCHTOWER_HOST` | хост Watchtower-эндпоинта (без `https://`) |
+| `WATCHTOWER_SECRET` | Bearer-токен Watchtower API |
+
 ## Локальная разработка (Docker Compose)
 
 `docker-compose.yml` поднимает Postgres + Redis + бота вместе — только для разработки:
