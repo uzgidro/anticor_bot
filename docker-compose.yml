@@ -1,3 +1,9 @@
+# Local development convenience: brings up Postgres + Redis + the bot together.
+# Production is a SINGLE bot container on a web panel that already provides
+# Postgres and Redis — there you build the image and run `python -m bot` with
+# the right env vars (POSTGRES__HOST / REDIS__HOST pointing at the panel's
+# services). The bot migrates itself on startup, so no compose is required in
+# prod. See README "Deploy on a web panel".
 services:
   postgres:
     image: postgres:16-alpine
@@ -29,20 +35,6 @@ services:
     expose:
       - "6379"
 
-  # One-shot migration job — runs to completion before the bot starts. Keeping
-  # migrations out of the bot process avoids races when scaling replicas.
-  migrate:
-    build: .
-    command: ["alembic", "upgrade", "head"]
-    env_file: .env
-    environment:
-      POSTGRES__HOST: postgres
-      REDIS__HOST: redis
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
   bot:
     build: .
     env_file: .env
@@ -54,9 +46,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     restart: unless-stopped
+    # The bot applies migrations itself on startup (RUN_MIGRATIONS_ON_STARTUP,
+    # default true), so no separate one-shot migrate job is needed — this also
+    # matches the production target (a web panel that runs a single container).
     # For webhook mode put a reverse proxy (nginx/Caddy) in front and expose only
     # that. The bot binds 127.0.0.1 by default and is not published here.
 

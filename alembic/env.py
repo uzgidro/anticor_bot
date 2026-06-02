@@ -25,9 +25,20 @@ target_metadata = Base.metadata
 
 
 def _get_dsn() -> str:
+    # An explicit URL (set by the programmatic helper or `-x`/ini) wins; fall
+    # back to app config so plain `alembic upgrade head` from a shell still works.
+    url = config.get_main_option("sqlalchemy.url")
+    if url:
+        return url
     from bot.config import Settings
 
     return Settings().postgres.dsn
+
+
+def _is_async_dsn(dsn: str) -> bool:
+    # asyncpg/aiosqlite drivers need the async engine + run_sync path; plain
+    # sync URLs (e.g. sqlite:///file.db) run through a normal engine.
+    return "+asyncpg" in dsn or "+aiosqlite" in dsn
 
 
 def run_migrations_offline() -> None:
@@ -54,15 +65,28 @@ def _do_run_migrations(connection) -> None:
         context.run_migrations()
 
 
-async def _run_async_migrations() -> None:
-    engine = create_async_engine(_get_dsn(), poolclass=None)
+async def _run_async_migrations(dsn: str) -> None:
+    engine = create_async_engine(dsn, poolclass=None)
     async with engine.connect() as connection:
         await connection.run_sync(_do_run_migrations)
     await engine.dispose()
 
 
+def _run_sync_migrations(dsn: str) -> None:
+    from sqlalchemy import create_engine
+
+    engine = create_engine(dsn, poolclass=None)
+    with engine.connect() as connection:
+        _do_run_migrations(connection)
+    engine.dispose()
+
+
 def run_migrations_online() -> None:
-    asyncio.run(_run_async_migrations())
+    dsn = _get_dsn()
+    if _is_async_dsn(dsn):
+        asyncio.run(_run_async_migrations(dsn))
+    else:
+        _run_sync_migrations(dsn)
 
 
 if context.is_offline_mode():

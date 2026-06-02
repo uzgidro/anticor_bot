@@ -5,7 +5,11 @@ from pydantic import SecretStr
 
 @pytest.fixture
 def base_env(monkeypatch):
-    """Minimal valid environment for Settings."""
+    """Minimal valid environment for Settings.
+
+    Pins every field these tests assert on (including passwords) so the suite is
+    hermetic and never inherits values from a developer's real ``.env``.
+    """
     env = {
         "BOT_TOKEN": "123:ABC",
         "ANON_ENC_KEY": "dGVzdC1rZXktMzItYnl0ZXMtZm9yLWZlcm5ldC10ZXN0cw==",
@@ -17,6 +21,7 @@ def base_env(monkeypatch):
         "POSTGRES__DB": "d",
         "REDIS__HOST": "rds",
         "REDIS__PORT": "6380",
+        "REDIS__PASSWORD": "",  # explicit: assert the no-auth DSN form
         "REDIS__DB": "2",
     }
     for k, v in env.items():
@@ -85,3 +90,19 @@ def test_locales_list_has_five(base_env):
 
     s = Settings()
     assert set(s.locales) == {"ru", "kaa", "uz_cyrl", "uz_latn", "en"}
+
+
+def test_run_migrations_on_startup_defaults_true(base_env):
+    from bot.config import Settings
+
+    # Convenient for dev / single-replica: schema is brought up to head on boot.
+    assert Settings().run_migrations_on_startup is True
+
+
+def test_run_migrations_on_startup_can_be_disabled(base_env, monkeypatch):
+    from bot.config import Settings
+
+    # Prod with multiple replicas: disable and run migrations as a separate step
+    # so replicas don't race to upgrade the same database.
+    monkeypatch.setenv("RUN_MIGRATIONS_ON_STARTUP", "false")
+    assert Settings().run_migrations_on_startup is False

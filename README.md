@@ -18,25 +18,45 @@
 
 Python 3.11+, aiogram 3.x, aiogram-i18n + Fluent, PostgreSQL (SQLAlchemy 2.0 async + asyncpg) + Alembic, Redis (FSM + throttling), Docker. Запуск — polling (тест) или webhook (прод).
 
-## Быстрый старт (Docker)
+## Конфигурация (`.env`)
 
-1. Скопируйте `.env.dist` → `.env` и заполните:
-   - `BOT_TOKEN` — токен от @BotFather;
-   - `ADMIN_IDS` — Telegram ID администраторов (через запятую);
-   - `ANON_ENC_KEY` — сгенерируйте: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`;
-   - `POSTGRES__PASSWORD`, `REDIS__PASSWORD` — пароли;
-   - для прода: `USE_WEBHOOK=true`, `WEBHOOK_URL` (HTTPS), `WEBHOOK_SECRET`.
-2. `make up` (или `docker compose up -d --build`).
+Скопируйте `.env.dist` → `.env` и заполните:
 
-Миграции применяются автоматически отдельным one-shot job `migrate` перед стартом бота.
+- `BOT_TOKEN` — токен от @BotFather;
+- `ADMIN_IDS` — Telegram ID администраторов (через запятую);
+- `ANON_ENC_KEY` — сгенерируйте: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`;
+- `POSTGRES__HOST/PORT/USER/PASSWORD/DB`, `REDIS__HOST/PORT/PASSWORD/DB` — реквизиты внешних БД и Redis;
+- для прода: `USE_WEBHOOK=true`, `WEBHOOK_URL` (HTTPS), `WEBHOOK_SECRET`.
+
+**Миграции применяются автоматически при старте бота** (`alembic upgrade head` внутри процесса). На старте бот ждёт готовности БД с ретраями. Это удобно для одиночного процесса/контейнера. Если у вас несколько реплик — выставьте `RUN_MIGRATIONS_ON_STARTUP=false` и применяйте миграции отдельным шагом (`alembic upgrade head`), чтобы реплики не гонялись за апгрейд.
+
+## Деплой на веб-панели (один контейнер)
+
+Целевой прод — **один контейнер бота** на хостинг-панели, где PostgreSQL и Redis уже предоставлены панелью (compose не нужен):
+
+1. Соберите образ из этого репозитория (`Dockerfile`) средствами панели или `docker build -t anticor-bot .`.
+2. Задайте переменные окружения контейнера: `BOT_TOKEN`, `ADMIN_IDS`, `ANON_ENC_KEY`, и реквизиты панельных сервисов — `POSTGRES__HOST/PORT/USER/PASSWORD/DB`, `REDIS__HOST/PORT/PASSWORD/DB`. Для webhook-режима — `USE_WEBHOOK/WEBHOOK_URL/WEBHOOK_SECRET`.
+3. Команда запуска контейнера — стандартная из образа: `python -m bot`. Бот сам накатит миграции на старте и подключится к внешним БД/Redis.
+4. Поставьте контейнеру политику авто-рестарта (панель обычно это умеет) — если БД ещё не готова, бот переподнимется.
+
+> Образ запускает **один долгоживущий процесс** и не публикует портов (для webhook TLS терминируйте на reverse-proxy панели). Никакого отдельного «migrate»-шага не требуется.
+
+## Локальная разработка (Docker Compose)
+
+`docker-compose.yml` поднимает Postgres + Redis + бота вместе — только для разработки:
+
+```bash
+make up      # docker compose up -d --build
+make logs    # docker compose logs -f bot
+make down
+```
 
 ## Локальный запуск (без Docker)
 
 ```bash
 make install
 # поднимите PostgreSQL и Redis, заполните .env (POSTGRES__HOST=localhost ...)
-make migrate
-make run
+make run      # миграции накатятся на старте автоматически
 ```
 
 ## Разработка

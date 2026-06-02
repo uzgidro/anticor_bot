@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     debug: bool = False
     default_locale: str = "ru"
     locales: tuple[str, ...] = LOCALES
+    # Apply Alembic migrations (upgrade head) on boot. Convenient for dev and a
+    # single replica. In prod with multiple replicas set this to false and run
+    # migrations as a separate one-shot step so replicas don't race the upgrade.
+    run_migrations_on_startup: bool = True
 
     @field_validator("admin_ids", mode="before")
     @classmethod
