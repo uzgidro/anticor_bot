@@ -228,6 +228,8 @@ def render_card(core: BaseCore, locale: str, sub: Submission, type_label: str) -
         if sub.phone:
             lines.append(core.get("card-phone", locale, phone=escape(sub.phone)))
     lines.append(core.get("card-text", locale, text=escape(sub.text)))
+    status_label = core.get(f"status-{sub.status.value}", locale)
+    lines.append(core.get("card-status", locale, status=status_label))
     return "\n".join(lines)
 
 

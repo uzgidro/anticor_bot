@@ -7,7 +7,12 @@ non-sensitive ids/actions; authorization is re-checked server-side on click.
 from __future__ import annotations
 
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.db.models import SubmissionType
@@ -75,7 +80,8 @@ def anon_keyboard(i18n) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text=i18n.get("btn-yes"), callback_data=AnonCb(value=True))
     kb.button(text=i18n.get("btn-no"), callback_data=AnonCb(value=False))
-    kb.adjust(2)
+    kb.button(text=i18n.get("btn-cancel"), callback_data=FormCb(action="cancel"))
+    kb.adjust(2, 1)
     return kb.as_markup()
 
 
@@ -136,5 +142,14 @@ def assign_type_keyboard(i18n, user_id: int) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def share_contact_text(i18n) -> str:
-    return i18n.get("btn-share-contact")
+def contact_keyboard(i18n) -> ReplyKeyboardMarkup:
+    """A one-shot reply keyboard offering to share the phone contact."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=i18n.get("btn-share-contact"), request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def remove_reply_keyboard() -> ReplyKeyboardRemove:
+    return ReplyKeyboardRemove()

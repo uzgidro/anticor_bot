@@ -87,6 +87,12 @@ def create_dispatcher(
 
     dp.include_router(root_router)
 
+    # Register the global error handler on the root router with the i18n core so
+    # the generic notice is localized to the user.
+    from bot.handlers import errors as errors_handlers
+
+    errors_handlers.register_errors(root_router, core, settings.default_locale)
+
     # Expose settings and the i18n core to handlers / startup.
     dp["settings"] = settings
     dp["i18n_core"] = core

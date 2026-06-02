@@ -180,3 +180,21 @@ async def test_appeal_flow_keeps_author(harness):
     assert sub.full_name == "Ivan Ivanov"
     assert sub.phone == "+998901112233"
     assert sub.author_user_id is not None
+
+
+@pytest.mark.asyncio
+async def test_double_submit_creates_single_submission(harness):
+    """Rapid double-tap on Submit must not create two submissions."""
+    dp, bot, pool = harness.dp, harness.bot, harness.pool
+    await dp.feed_update(bot, _cb("menu:appeal"))
+    await dp.feed_update(bot, _text("Name"))
+    await dp.feed_update(bot, _text("+998901112233"))
+    await dp.feed_update(bot, _text("Some appeal text"))
+    await dp.feed_update(bot, _cb("form:skip"))
+    # Two submits in a row (second should be ignored — state already cleared).
+    await dp.feed_update(bot, _cb("form:submit"))
+    await dp.feed_update(bot, _cb("form:submit"))
+
+    async with pool() as s:
+        subs = list(await s.scalars(select(Submission)))
+    assert len(subs) == 1

@@ -2,7 +2,7 @@
 import pytest
 from cryptography.fernet import Fernet
 
-from bot.db.models import AttachmentType, Submission, SubmissionType
+from bot.db.models import AttachmentType, Submission, SubmissionStatus, SubmissionType
 from bot.security.crypto import AnonCipher
 
 
@@ -133,8 +133,8 @@ async def test_render_card_anonymous_has_no_pii():
 
     sub = Submission(
         id=1, public_id="ABC", ticket_number="COR-2026-0001",
-        type=SubmissionType.corruption, is_anonymous=True, text="secret report",
-        full_name="LEAK NAME", phone="+998999999999",
+        type=SubmissionType.corruption, status=SubmissionStatus.new, is_anonymous=True,
+        text="secret report", full_name="LEAK NAME", phone="+998999999999",
     )
     card = render_card(core, "ru", sub, type_label="Жалоба")
     assert "LEAK NAME" not in card

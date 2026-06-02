@@ -19,7 +19,9 @@ from bot.keyboards.inline import (
     anon_keyboard,
     attachments_keyboard,
     confirm_keyboard,
+    contact_keyboard,
     nav_keyboard,
+    remove_reply_keyboard,
 )
 from bot.services.submissions import (
     AttachmentInput,
@@ -74,7 +76,11 @@ async def _ask_name(message: Message, state: FSMContext, i18n: I18nContext) -> N
 
 async def _ask_phone(message: Message, state: FSMContext, i18n: I18nContext) -> None:
     await state.set_state(SubmissionForm.phone)
-    await message.answer(i18n.get("form-ask-phone"), reply_markup=nav_keyboard(i18n))
+    # The "share contact" button must live on a ReplyKeyboard (Telegram only
+    # allows request_contact there), so the phone step uses that; back/cancel
+    # remain available via the inline nav shown on the preceding step and the
+    # /cancel command.
+    await message.answer(i18n.get("form-ask-phone"), reply_markup=contact_keyboard(i18n))
 
 
 async def _ask_text(message: Message, state: FSMContext, i18n: I18nContext) -> None:
@@ -108,6 +114,8 @@ async def on_name_invalid(message: Message, i18n: I18nContext) -> None:
 @router.message(SubmissionForm.phone, F.contact)
 async def on_phone_contact(message: Message, state: FSMContext, i18n: I18nContext) -> None:
     await state.update_data(phone=message.contact.phone_number)
+    # Drop the one-time contact reply keyboard before the next inline step.
+    await message.answer("✅", reply_markup=remove_reply_keyboard())
     await _ask_text(message, state, i18n)
 
 
@@ -117,6 +125,7 @@ async def on_phone_text(message: Message, state: FSMContext, i18n: I18nContext) 
         await message.answer(i18n.get("form-invalid-phone"))
         return
     await state.update_data(phone=message.text.strip())
+    await message.answer("✅", reply_markup=remove_reply_keyboard())
     await _ask_text(message, state, i18n)
 
 
@@ -242,7 +251,14 @@ async def on_submit(
     from bot.security.crypto import AnonCipher
 
     data = await state.get_data()
+    if "type" not in data:
+        # State already consumed (e.g. a rapid double-tap on Submit). Ignore the
+        # duplicate so we never create two submissions / two fan-outs.
+        await query.answer()
+        return
     type_ = SubmissionType(data["type"])
+    # Clear state up front so a concurrent second tap hits the guard above.
+    await state.clear()
     cipher = AnonCipher(settings.anon_enc_key)
     svc = SubmissionService(session, cipher)
     sub = await svc.create(
@@ -260,7 +276,6 @@ async def on_submit(
             ],
         )
     )
-    await state.clear()
 
     # Commit BEFORE any network fan-out: responsibles must never receive a card
     # for a submission that a later rollback would erase. Capture ids first

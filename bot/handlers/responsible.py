@@ -131,7 +131,11 @@ async def on_reply_start(
         return
     await state.set_state(ResponseForm.text)
     await state.update_data(submission_id=sub.id)
-    await query.message.answer(i18n.get("reply-ask"))
+    if query.message is not None:
+        await query.message.answer(i18n.get("reply-ask"))
+    else:
+        # Card too old to carry a message; prompt via the bot directly.
+        await query.bot.send_message(query.from_user.id, i18n.get("reply-ask"))
     await query.answer()
 
 

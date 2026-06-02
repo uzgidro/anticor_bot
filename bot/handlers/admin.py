@@ -92,14 +92,15 @@ async def cmd_responsibles(message: Message, i18n: I18nContext, session) -> None
             roles.append(i18n.get("type-corruption"))
         name = escape(u.full_name) if u.full_name else str(u.tg_id)
         lines.append(f"• {name} — {', '.join(roles)}")
+        revoke = i18n.get("btn-revoke")
         if u.resp_appeal:
             kb.button(
-                text=f"🗑 {name}: {i18n.get('type-appeal')}",
+                text=f"{revoke}: {name} / {i18n.get('type-appeal')}",
                 callback_data=RevokeCb(user_id=u.id, type=SubmissionType.appeal.value),
             )
         if u.resp_corruption:
             kb.button(
-                text=f"🗑 {name}: {i18n.get('type-corruption')}",
+                text=f"{revoke}: {name} / {i18n.get('type-corruption')}",
                 callback_data=RevokeCb(user_id=u.id, type=SubmissionType.corruption.value),
             )
     kb.adjust(1)
