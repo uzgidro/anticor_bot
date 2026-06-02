@@ -6,6 +6,8 @@ every request via the X-Telegram-Bot-Api-Secret-Token header.
 """
 from __future__ import annotations
 
+import asyncio
+
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
@@ -23,7 +25,6 @@ async def _on_startup(bot: Bot, settings: Settings) -> None:
 
 def build_app(bot: Bot, dp: Dispatcher, settings: Settings) -> web.Application:
     app = web.Application()
-    app["bot"] = bot
 
     async def _startup(_: web.Application) -> None:
         await _on_startup(bot, settings)
@@ -46,8 +47,6 @@ async def run_webhook(bot: Bot, dp: Dispatcher, settings: Settings) -> None:
     site = web.TCPSite(runner, host=settings.webhook_host, port=settings.webhook_port)
     await site.start()
     # Block until cancelled (e.g. SIGTERM).
-    import asyncio
-
     try:
         await asyncio.Event().wait()
     finally:

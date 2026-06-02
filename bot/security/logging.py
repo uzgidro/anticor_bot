@@ -14,10 +14,14 @@ from __future__ import annotations
 import logging
 import re
 
-# Phone-like: a leading + or contains separators (spaces/dashes/parens).
-_PHONE_RE = re.compile(r"\+\d[\d\-\s()]{5,}\d|\d[\d\-\s()]{2,}[-\s()][\d\-\s()]*\d")
-# Bare long digit runs (tg_ids are 6-12+ digits).
-_LONG_DIGITS_RE = re.compile(r"\b\d{6,}\b")
+# Phone-like: international (+998...) or a separated run with >=7 digits total.
+# Kept deliberately specific so ticket numbers (OBR-2026-0001) and dates
+# (2026-06-02) are NOT mangled.
+_PHONE_RE = re.compile(r"\+\d[\d\-\s()]{6,}\d")
+# Bare long digit runs (tg_ids are 6-12+ digits). \b ensures we don't touch the
+# digits inside OBR-2026-0001 (preceded by a letter/dash, not a word boundary
+# start) — but 2026 alone is 4 digits and below the {7,} threshold anyway.
+_LONG_DIGITS_RE = re.compile(r"(?<![\d-])\d{7,}(?![\d-])")
 
 
 def redact(text: str) -> str:
@@ -32,6 +36,10 @@ class PiiRedactingFilter(logging.Filter):
         try:
             msg = record.getMessage()
         except Exception:
+            # Fail safe: if we can't format/inspect the message, drop it rather
+            # than risk emitting un-redacted PII.
+            record.msg = "[log record suppressed: unformattable]"
+            record.args = ()
             return True
         redacted = redact(msg)
         if redacted != msg:
@@ -52,3 +60,6 @@ def setup_logging(*, debug: bool = False) -> None:
     root.setLevel(level)
     # aiogram logs full updates at DEBUG — never allow that in this bot.
     logging.getLogger("aiogram.event").setLevel(max(level, logging.INFO))
+    # SQLAlchemy echo would log bound params (submission text/name/phone) — keep
+    # it at WARNING regardless of debug so PII never reaches logs via SQL.
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     webhook_url: str = "https://example.com"
     webhook_path: str = "/webhook"
     webhook_secret: SecretStr = SecretStr("")
-    webhook_host: str = "0.0.0.0"
+    webhook_host: str = "127.0.0.1"  # bind localhost; TLS terminates at the proxy
     webhook_port: int = 8080
     drop_pending_updates: bool = True
 

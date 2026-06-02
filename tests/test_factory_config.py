@@ -44,12 +44,14 @@ async def test_factory_builds_dispatcher_with_middleware_order(settings):
     bot, dp, redis, engine = factory.build(settings)
     try:
         names = [type(m).__name__ for m in dp.update.outer_middleware]
+        assert "ThrottlingMiddleware" in names
         assert "DbSessionMiddleware" in names
         assert "UserMiddleware" in names
-        assert "ThrottlingMiddleware" in names
-        # Documented order: DbSession -> User -> (i18n) -> Throttling.
+        # Documented order: Throttling (reject flood before DB) -> DbSession ->
+        # User -> i18n.
+        assert names.index("ThrottlingMiddleware") < names.index("DbSessionMiddleware")
         assert names.index("DbSessionMiddleware") < names.index("UserMiddleware")
-        assert names.index("UserMiddleware") < names.index("ThrottlingMiddleware")
+        assert names.index("UserMiddleware") < names.index("I18nMiddleware")
     finally:
         await redis.aclose()
         await engine.dispose()

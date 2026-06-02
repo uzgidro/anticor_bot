@@ -192,3 +192,67 @@ def test_logging_filter_scrubs(caplog):
     with caplog.at_level(logging.INFO, logger="test.pii"):
         logger.info("anon tg 987654321 submitted")
     assert "987654321" not in caplog.text
+
+
+# ---------- ThrottlingMiddleware ----------
+
+class _FakeRedis:
+    """Minimal Redis stub supporting SET NX PX semantics for throttle tests."""
+
+    def __init__(self):
+        self.store: dict[str, int] = {}
+
+    async def set(self, key, value, px=None, nx=False):
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+
+class _FakeState:
+    def __init__(self, state):
+        self._state = state
+
+    async def get_state(self):
+        return self._state
+
+
+@pytest.mark.asyncio
+async def test_throttling_blocks_second_rapid_update():
+    from bot.middlewares.throttling import ThrottlingMiddleware
+
+    redis = _FakeRedis()
+    mw = ThrottlingMiddleware(redis=redis, rate_ms=400)
+    tg_user = SimpleNamespace(id=1)
+    calls = []
+
+    async def handler(event, data):
+        calls.append(1)
+        return "ok"
+
+    data = {"event_from_user": tg_user, "state": _FakeState(None)}
+    r1 = await mw(handler, SimpleNamespace(), dict(data))
+    r2 = await mw(handler, SimpleNamespace(), dict(data))
+    assert r1 == "ok"
+    assert r2 is None  # second within window blocked
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_throttling_exempts_active_form_state():
+    from bot.middlewares.throttling import ThrottlingMiddleware
+
+    redis = _FakeRedis()
+    mw = ThrottlingMiddleware(redis=redis, rate_ms=400)
+    tg_user = SimpleNamespace(id=2)
+    calls = []
+
+    async def handler(event, data):
+        calls.append(1)
+        return "ok"
+
+    # Active FSM state -> every step passes (no throttle).
+    data = {"event_from_user": tg_user, "state": _FakeState("Form:name")}
+    assert await mw(handler, SimpleNamespace(), dict(data)) == "ok"
+    assert await mw(handler, SimpleNamespace(), dict(data)) == "ok"
+    assert len(calls) == 2
