@@ -14,17 +14,20 @@ from bot.security.logging import setup_logging
 async def main() -> None:
     settings = Settings()
     setup_logging(debug=settings.debug)
-    bot, dp, _redis, _engine = build(settings)
+    bot, dp, redis, engine = build(settings)
     core = dp["i18n_core"]
-    await core.startup()
-    await set_commands(bot, core, settings.locales, settings.default_locale)
     try:
+        await core.startup()
+        await set_commands(bot, core, settings.locales, settings.default_locale)
         if settings.use_webhook:
             await run_webhook(bot, dp, settings)
         else:
             await run_polling(bot, dp, settings)
     finally:
+        # Always release resources even if startup (set_commands etc.) fails.
         await bot.session.close()
+        await redis.aclose()
+        await engine.dispose()
 
 
 if __name__ == "__main__":
