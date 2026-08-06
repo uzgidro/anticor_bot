@@ -32,7 +32,7 @@ class LangCb(CallbackData, prefix="lang"):
 
 
 class MenuCb(CallbackData, prefix="menu"):
-    action: str  # appeal | corruption | my | language
+    action: str  # appeal | corruption | my | language | reg_appeal | reg_corruption
 
 
 class AnonCb(CallbackData, prefix="anon"):
@@ -137,6 +137,126 @@ def assign_type_keyboard(i18n, user_id: int) -> InlineKeyboardMarkup:
     kb.button(
         text=i18n.get("btn-resp-corruption"),
         callback_data=AssignTypeCb(user_id=user_id, type=SubmissionType.corruption.value),
+    )
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+class RegistryCb(CallbackData, prefix="reg"):
+    """Registry navigation state.
+
+    The whole filter/sort/page state rides in the payload (48 bytes worst case
+    against Telegram's 64-byte cap), so the registry needs no FSM and an old
+    keyboard keeps working after a bot restart.
+
+    ``open`` empty means the list view; otherwise it is the public_id to show.
+    """
+
+    type: str  # appeal | corruption — fixed on entry, never changes
+    status: str  # all | new | in_progress | closed
+    order: str  # desc | asc
+    page: int
+    open: str
+
+
+# Status filter buttons: (i18n key, status value carried in callback data).
+_STATUS_FILTERS = [
+    ("btn-filter-all", "all"),
+    ("btn-filter-new", "new"),
+    ("btn-filter-in-progress", "in_progress"),
+    ("btn-filter-closed", "closed"),
+]
+
+
+def registry_list_kb(
+    i18n,
+    *,
+    type_: str,
+    status: str,
+    order: str,
+    page: int,
+    public_ids: list[str],
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    """List view: open-buttons per row, status filters, sort toggle, paging."""
+    kb = InlineKeyboardBuilder()
+
+    def cb(**over) -> RegistryCb:
+        base = {
+            "type": type_, "status": status, "order": order, "page": page, "open": "",
+        }
+        return RegistryCb(**{**base, **over})
+
+    for n, public_id in enumerate(public_ids, start=1):
+        kb.button(text=str(n), callback_data=cb(open=public_id))
+    kb.adjust(len(public_ids) or 1)
+
+    filters = InlineKeyboardBuilder()
+    for key, value in _STATUS_FILTERS:
+        # Switching a filter resets to the first page: the old offset may not
+        # exist in the new result set.
+        filters.button(text=i18n.get(key), callback_data=cb(status=value, page=0))
+    filters.adjust(4)
+    kb.attach(filters)
+
+    sort = InlineKeyboardBuilder()
+    sort.button(text=i18n.get("btn-sort-newest"), callback_data=cb(order="desc", page=0))
+    sort.button(text=i18n.get("btn-sort-oldest"), callback_data=cb(order="asc", page=0))
+    sort.adjust(2)
+    kb.attach(sort)
+
+    if total_pages > 1:
+        nav = InlineKeyboardBuilder()
+        if page > 0:
+            nav.button(text="◀️", callback_data=cb(page=page - 1))
+        nav.button(
+            text=i18n.get("registry-page", page=page + 1, pages=total_pages),
+            callback_data=cb(),  # no-op label; tapping re-renders the same page
+        )
+        if page < total_pages - 1:
+            nav.button(text="▶️", callback_data=cb(page=page + 1))
+        nav.adjust(3)
+        kb.attach(nav)
+
+    return kb.as_markup()
+
+
+def registry_detail_kb(
+    i18n,
+    *,
+    submission_id: int,
+    type_: str,
+    status: str,
+    order: str,
+    page: int,
+    status_value: str,
+) -> InlineKeyboardMarkup:
+    """Detail view: the SAME ReactionCb actions as the push card, plus Back.
+
+    Actions are deliberately not new callbacks — responsible.py already handles
+    ReactionCb with the authorization checks, and duplicating them would split
+    authz across two code paths.
+    """
+    kb = InlineKeyboardBuilder()
+    if status_value != "closed":
+        if status_value == "new":
+            kb.button(
+                text=i18n.get("btn-take"),
+                callback_data=ReactionCb(action="take", submission_id=submission_id),
+            )
+        kb.button(
+            text=i18n.get("btn-reply"),
+            callback_data=ReactionCb(action="reply", submission_id=submission_id),
+        )
+        kb.button(
+            text=i18n.get("btn-close"),
+            callback_data=ReactionCb(action="close", submission_id=submission_id),
+        )
+    kb.button(
+        text=i18n.get("btn-back-to-list"),
+        callback_data=RegistryCb(
+            type=type_, status=status, order=order, page=page, open=""
+        ),
     )
     kb.adjust(1)
     return kb.as_markup()
