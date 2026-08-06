@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from aiogram import Router
 
-from bot.handlers import admin, my_submissions, responsible, start, submission
+from bot.handlers import admin, my_submissions, registry, responsible, start, submission
 
 router = Router(name="root")
 
@@ -16,6 +16,7 @@ router = Router(name="root")
 # explicit StateFilters take precedence; start/menu handle the rest.
 router.include_router(admin.router)
 router.include_router(responsible.router)
+router.include_router(registry.router)
 router.include_router(submission.router)
 router.include_router(my_submissions.router)
 router.include_router(start.router)
