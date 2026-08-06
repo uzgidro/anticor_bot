@@ -1,0 +1,50 @@
+# Build context exclusions.
+#
+# CRITICAL: without this file `COPY . .` bakes .env — with the real BOT_TOKEN
+# and ANON_ENC_KEY — into a published image. It also copied the local .venv,
+# which shipped an outdated setuptools and tripped the Trivy gate.
+
+# Secrets — never in an image. The container gets its config from env vars.
+.env
+*.env
+!.env.dist
+
+# Local virtualenvs (host-specific, and their pinned packages get scanned)
+.venv/
+venv/
+
+# VCS and CI
+.git/
+.gitignore
+.github/
+
+# Python artifacts. Note *.egg-info and build/ are also produced *inside* the
+# image by `pip install .`; excluding them here keeps host copies out.
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Tests and docs are not needed at runtime
+tests/
+docs/
+
+# Local dev tooling — prod is a single container
+docker-compose.yml
+Dockerfile
+.dockerignore
+Makefile
+
+# Local data / logs
+logs/
+*.log
+*.sqlite
+*.db
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

@@ -117,6 +117,21 @@ Prod target is a **single container** on a hosting panel with panel-provided Pos
 
 Config is pydantic-settings with `__` nesting (`POSTGRES__HOST`); secrets are `SecretStr`. `ANON_ENC_KEY` must be a valid Fernet key or the bot refuses to start.
 
+### Image hygiene — `.dockerignore` is load-bearing
+
+The Dockerfile copies only `pyproject.toml`, `alembic.ini`, `bot/`, and `alembic/`. Never revert it to `COPY . .`: with the build context unfiltered, that baked **`.env` — the real `BOT_TOKEN` and `ANON_ENC_KEY` — into a published Docker Hub image**, and copied the local `.venv`, whose stale `setuptools` failed the Trivy gate.
+
+`pip`/`setuptools`/`wheel` are uninstalled after `pip install .`: the container only runs `python -m bot`, and pip's *vendored* copies (`pip/_vendor/msgpack`) are scanner findings that cannot be patched any other way. If you add a runtime that shells out to pip, this breaks.
+
+Verify a build locally before trusting CI:
+
+```bash
+docker build --pull -t anticor:test .
+docker run --rm anticor:test sh -c '[ -f /app/.env ] && echo LEAK || echo clean'
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.69.3 \
+  image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 anticor:test
+```
+
 ## Knowledge base
 
 Per global instructions, project findings/cases go to the Obsidian vault at `E:\projects\obsidian\sukhrob` — see `Проекты/python/` and `Кейсы/`, tag `#проект/anticor-bot`.
