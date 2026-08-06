@@ -13,10 +13,12 @@ from aiogram.types import CallbackQuery, Message
 from aiogram_i18n import I18nContext
 from sqlalchemy import or_, select
 
+from bot.config import Settings
 from bot.db.models import SubmissionType, User
 from bot.db.repositories import AuditRepository, UserRepository
 from bot.filters.roles import IsAdmin
 from bot.keyboards.inline import AssignTypeCb, RevokeCb, assign_type_keyboard
+from bot.runners.commands import set_personal_commands
 from bot.utils.text import escape
 
 router = Router(name="admin")
@@ -50,7 +52,7 @@ async def cmd_assign(message: Message, i18n: I18nContext, session) -> None:
 @router.callback_query(AssignTypeCb.filter())
 async def on_assign_type(
     query: CallbackQuery, callback_data: AssignTypeCb, db_user: User,
-    i18n: I18nContext, session,
+    i18n: I18nContext, session, settings: Settings,
 ) -> None:
     target = await session.get(User, callback_data.user_id)
     if target is None:
@@ -66,6 +68,7 @@ async def on_assign_type(
         target=f"user:{target.id}", meta=f"+{type_.value}",
     )
     await session.commit()
+    await _refresh_commands(query, target, i18n.core, settings.default_locale)
     await query.message.edit_text(i18n.get("admin-assigned", user=str(target.tg_id)))
     await query.answer()
 
@@ -110,7 +113,7 @@ async def cmd_responsibles(message: Message, i18n: I18nContext, session) -> None
 @router.callback_query(RevokeCb.filter())
 async def on_revoke(
     query: CallbackQuery, callback_data: RevokeCb, db_user: User,
-    i18n: I18nContext, session,
+    i18n: I18nContext, session, settings: Settings,
 ) -> None:
     target = await session.get(User, callback_data.user_id)
     if target is None:
@@ -126,4 +129,21 @@ async def on_revoke(
         target=f"user:{target.id}", meta=f"-{type_.value}",
     )
     await session.commit()
+    await _refresh_commands(query, target, i18n.core, settings.default_locale)
     await query.answer(i18n.get("admin-revoked"))
+
+
+async def _refresh_commands(
+    query: CallbackQuery, target: User, core, default_locale: str
+) -> None:
+    """Update the target user's personal '/' menu after a role change.
+
+    Best-effort: a user who has never started the bot has no reachable chat
+    scope, and that must never fail the role change itself.
+    """
+    from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+
+    try:
+        await set_personal_commands(query.bot, core, target, default_locale)
+    except (TelegramBadRequest, TelegramForbiddenError):
+        pass

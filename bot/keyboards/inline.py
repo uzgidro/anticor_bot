@@ -66,11 +66,27 @@ def language_keyboard() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def main_menu_keyboard(i18n) -> InlineKeyboardMarkup:
+def main_menu_keyboard(i18n, db_user=None) -> InlineKeyboardMarkup:
+    """Main menu; registry entries appear only for the roles that may use them.
+
+    ``db_user`` is optional so the citizen menu stays the default. Hiding a
+    button is UX only — the handlers re-check the role on every click.
+    """
     kb = InlineKeyboardBuilder()
     kb.button(text=i18n.get("btn-appeal"), callback_data=MenuCb(action="appeal"))
     kb.button(text=i18n.get("btn-corruption"), callback_data=MenuCb(action="corruption"))
     kb.button(text=i18n.get("btn-my-submissions"), callback_data=MenuCb(action="my"))
+    if db_user is not None:
+        if db_user.is_admin or db_user.resp_appeal:
+            kb.button(
+                text=i18n.get("btn-registry-appeals"),
+                callback_data=MenuCb(action="reg_appeal"),
+            )
+        if db_user.is_admin or db_user.resp_corruption:
+            kb.button(
+                text=i18n.get("btn-registry-complaints"),
+                callback_data=MenuCb(action="reg_corruption"),
+            )
     kb.button(text=i18n.get("btn-change-language"), callback_data=MenuCb(action="language"))
     kb.adjust(1)
     return kb.as_markup()

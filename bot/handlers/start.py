@@ -13,8 +13,12 @@ from bot.keyboards.inline import LangCb, MenuCb, language_keyboard, main_menu_ke
 router = Router(name="start")
 
 
-async def show_menu(message: Message, i18n: I18nContext) -> None:
-    await message.answer(i18n.get("main-menu"), reply_markup=main_menu_keyboard(i18n))
+async def show_menu(
+    message: Message, i18n: I18nContext, db_user: User | None = None
+) -> None:
+    await message.answer(
+        i18n.get("main-menu"), reply_markup=main_menu_keyboard(i18n, db_user)
+    )
 
 
 @router.message(CommandStart())
@@ -23,7 +27,7 @@ async def cmd_start(message: Message, db_user: User, i18n: I18nContext, state: F
     if not db_user.language:
         await message.answer(i18n.get("choose-language"), reply_markup=language_keyboard())
         return
-    await show_menu(message, i18n)
+    await show_menu(message, i18n, db_user)
 
 
 @router.callback_query(LangCb.filter())
@@ -35,7 +39,9 @@ async def on_language_chosen(
 ) -> None:
     await i18n.set_locale(callback_data.code, db_user=db_user)
     await query.message.edit_text(i18n.get("language-set"))
-    await query.message.answer(i18n.get("main-menu"), reply_markup=main_menu_keyboard(i18n))
+    await query.message.answer(
+        i18n.get("main-menu"), reply_markup=main_menu_keyboard(i18n, db_user)
+    )
     await query.answer()
 
 

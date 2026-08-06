@@ -9,7 +9,7 @@ command menu is decorative, while the actual UI language comes from
 from __future__ import annotations
 
 from aiogram import Bot
-from aiogram.types import BotCommand, BotCommandScopeDefault
+from aiogram.types import BotCommand, BotCommandScopeChat, BotCommandScopeDefault
 
 # (command, i18n key) — descriptions are localized via the i18n core.
 _COMMANDS = [
@@ -56,3 +56,39 @@ async def set_commands(bot: Bot, core, locales: tuple[str, ...], default_locale:
         )
     # Fallback for clients with an unlisted language (default scope, no code).
     await bot.set_my_commands(_commands_for(core, default_locale), scope=BotCommandScopeDefault())
+
+
+# Registry commands and the role flag that unlocks each, checked per user.
+_REGISTRY_COMMANDS = [
+    ("appeals", "cmd-appeals", "resp_appeal"),
+    ("complaints", "cmd-complaints", "resp_corruption"),
+]
+
+
+async def set_personal_commands(bot: Bot, core, user, default_locale: str) -> None:
+    """Set this user's private '/' menu according to their roles.
+
+    A chat-scoped list REPLACES the global one for that chat, so the base
+    commands are re-sent alongside the registry ones — otherwise assigning a
+    role would strip /start from that user's menu. With no roles left we delete
+    the scope so the global list applies again.
+
+    The menu is UX, not authorization: the handlers gate on the role filters
+    regardless, since a command can always be typed by hand.
+    """
+    locale = getattr(user, "language", None) or default_locale
+    scope = BotCommandScopeChat(chat_id=user.tg_id)
+
+    extra = [
+        (cmd, key)
+        for cmd, key, flag in _REGISTRY_COMMANDS
+        if user.is_admin or getattr(user, flag, False)
+    ]
+    if not extra:
+        await bot.delete_my_commands(scope=scope)
+        return
+
+    commands = _commands_for(core, locale) + [
+        BotCommand(command=cmd, description=core.get(key, locale)) for cmd, key in extra
+    ]
+    await bot.set_my_commands(commands, scope=scope)
