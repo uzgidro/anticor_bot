@@ -80,6 +80,17 @@ Ordering rule in [handlers/submission.py](bot/handlers/submission.py#L280): **co
 
 `IsAdmin` / `IsResponsible` in [bot/filters/roles.py](bot/filters/roles.py) gate routers by role only. Object-level authz (may this user act on *this* submission) is re-checked server-side in [responsible.py `_authorize`](bot/handlers/responsible.py#L32) — callback data is client-supplied and never trusted for authz. `require_owner=True` (reply/close) additionally demands the assignee-or-admin, since ownership is first-claim.
 
+### Registry ([bot/handlers/registry.py](bot/handlers/registry.py))
+
+A browsable list for responsibles/admins — a new **entry point to existing rights**, never new rights. Two invariants hold it together:
+
+- Visibility is `can_handle_type()`, the same check that gates the push card, re-checked on **every** callback because a keyboard outlives a role change and callback data is client-supplied. In `_show_detail` the type is re-derived from the row, so a crafted `public_id` cannot smuggle a foreign-type submission past the gate.
+- Actions are **not** reimplemented: the detail keyboard emits the existing `ReactionCb`, handled by `responsible.py` with its `_authorize()`. `registry.refresh_detail()` only redraws afterwards. Never add a competing `ReactionCb` handler — that splits authz in two.
+
+Filter/sort/page state lives in `RegistryCb` (43 bytes worst case, Telegram's cap is 64) rather than FSM, so it never collides with `SubmissionForm` and survives a restart. `registry.py` must not import `responsible.py` — the dependency is one-way, enforced by a test.
+
+`set_personal_commands()` uses `BotCommandScopeChat`, which **replaces** the whole list for that chat: it re-sends the base commands with the registry ones, and deletes the scope when the last role is revoked.
+
 ### Multi-locale messaging
 
 Two distinct paths, don't mix them:
