@@ -16,6 +16,7 @@ from bot.config import Settings
 from bot.db.models import User
 from bot.db.repositories import AuditRepository, SubmissionRepository
 from bot.filters.roles import can_handle_type
+from bot.handlers import registry
 from bot.handlers.states import ResponseForm
 from bot.keyboards.inline import ReactionCb
 from bot.security.crypto import AnonCipher
@@ -82,6 +83,9 @@ async def on_take(
     taker = escape(db_user.full_name) if db_user.full_name else "—"
     await svc.update_all_cards(query.bot, i18n.core, sub, "card-assigned", name=taker)
     await session.commit()
+    # If the click came from the registry, redraw that screen too — the card
+    # update above only touches the push cards.
+    await registry.refresh_detail(query, i18n, session, sub.id)
     await query.answer(i18n.get("cb-taken"))
 
 
@@ -116,6 +120,7 @@ async def on_close(
         text = i18n.core.get("submission-closed-notify", locale, public_id=sub.public_id)
         await safe_send(query.bot, chat_id, text)
     await session.commit()
+    await registry.refresh_detail(query, i18n, session, sub.id)
     await query.answer(i18n.get("cb-closed"))
 
 
