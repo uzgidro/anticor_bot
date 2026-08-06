@@ -106,3 +106,21 @@ new-submission-admin-alert = ⚠️ { $public_id } ({ $type }) мурожаат 
 cmd-start = Асосий меню
 cmd-language = Тилни ўзгартириш
 cmd-cancel = Жорий амални бекор қилиш
+
+# ===== Мурожаатлар реестри =====
+btn-registry-appeals = 🗂 Мурожаатлар
+btn-registry-complaints = 🗂 Шикоятлар
+registry-title = 🗂 { $type } · { $filter } · { $order }
+registry-empty = 📭 Ушбу филтр бўйича мурожаатлар йўқ.
+registry-item = { $n }. { $status } { $public_id } · { $author } · { $date }
+registry-page = { $pages } дан { $page }-саҳифа
+registry-not-found = ⚠️ Мурожаат топилмади ёки ўчирилган.
+btn-filter-all = Барчаси
+btn-filter-new = 🆕 Янги
+btn-filter-in-progress = 🟡 Ишланмоқда
+btn-filter-closed = ✅ Ёпилган
+btn-sort-newest = ↓ Аввал янгилари
+btn-sort-oldest = ↑ Аввал эскилари
+btn-back-to-list = ◀️ Рўйхатга
+cmd-appeals = Мурожаатлар реестри
+cmd-complaints = Шикоятлар реестри

@@ -106,3 +106,21 @@ new-submission-admin-alert = ⚠️ { $public_id } ({ $type }) murojaat keldi, b
 cmd-start = Asosiy menyu
 cmd-language = Tilni oʻzgartirish
 cmd-cancel = Joriy amalni bekor qilish
+
+# ===== Murojaatlar reyestri =====
+btn-registry-appeals = 🗂 Murojaatlar
+btn-registry-complaints = 🗂 Shikoyatlar
+registry-title = 🗂 { $type } · { $filter } · { $order }
+registry-empty = 📭 Ushbu filtr boʻyicha murojaatlar yoʻq.
+registry-item = { $n }. { $status } { $public_id } · { $author } · { $date }
+registry-page = { $pages } dan { $page }-sahifa
+registry-not-found = ⚠️ Murojaat topilmadi yoki oʻchirilgan.
+btn-filter-all = Barchasi
+btn-filter-new = 🆕 Yangi
+btn-filter-in-progress = 🟡 Ishlanmoqda
+btn-filter-closed = ✅ Yopilgan
+btn-sort-newest = ↓ Avval yangilari
+btn-sort-oldest = ↑ Avval eskilari
+btn-back-to-list = ◀️ Roʻyxatga
+cmd-appeals = Murojaatlar reyestri
+cmd-complaints = Shikoyatlar reyestri

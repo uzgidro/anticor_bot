@@ -106,3 +106,22 @@ new-submission-admin-alert = ⚠️ { $public_id } ({ $type }) múráját keldi,
 cmd-start = Tiykarǵı menyu
 cmd-language = Tildi ózgertiw
 cmd-cancel = Házirgi háreketti biykarlaw
+
+# ===== Múrájatlar reestri =====
+# TODO: вычитка носителем
+btn-registry-appeals = 🗂 Múrájatlar
+btn-registry-complaints = 🗂 Shaǵımlar
+registry-title = 🗂 { $type } · { $filter } · { $order }
+registry-empty = 📭 Bul filtr boyınsha múrájatlar joq.
+registry-item = { $n }. { $status } { $public_id } · { $author } · { $date }
+registry-page = { $pages } den { $page }-bet
+registry-not-found = ⚠️ Múrájat tabılmadı yamasa óshirilgen.
+btn-filter-all = Barlıǵı
+btn-filter-new = 🆕 Jańa
+btn-filter-in-progress = 🟡 Islenbekte
+btn-filter-closed = ✅ Jabılǵan
+btn-sort-newest = ↓ Aldın jańaları
+btn-sort-oldest = ↑ Aldın eskileri
+btn-back-to-list = ◀️ Dizimge
+cmd-appeals = Múrájatlar reestri
+cmd-complaints = Shaǵımlar reestri

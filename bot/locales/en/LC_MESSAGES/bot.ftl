@@ -106,3 +106,21 @@ new-submission-admin-alert = ⚠️ Submission { $public_id } ({ $type }) arrive
 cmd-start = Main menu
 cmd-language = Change language
 cmd-cancel = Cancel the current action
+
+# ===== Submissions registry =====
+btn-registry-appeals = 🗂 Appeals
+btn-registry-complaints = 🗂 Complaints
+registry-title = 🗂 { $type } · { $filter } · { $order }
+registry-empty = 📭 No submissions match this filter.
+registry-item = { $n }. { $status } { $public_id } · { $author } · { $date }
+registry-page = Page { $page } of { $pages }
+registry-not-found = ⚠️ Submission not found or deleted.
+btn-filter-all = All
+btn-filter-new = 🆕 New
+btn-filter-in-progress = 🟡 In progress
+btn-filter-closed = ✅ Closed
+btn-sort-newest = ↓ Newest first
+btn-sort-oldest = ↑ Oldest first
+btn-back-to-list = ◀️ Back to list
+cmd-appeals = Appeals registry
+cmd-complaints = Complaints registry

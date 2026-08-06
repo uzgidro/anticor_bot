@@ -106,3 +106,21 @@ new-submission-admin-alert = ⚠️ Поступило обращение { $pub
 cmd-start = Главное меню
 cmd-language = Сменить язык
 cmd-cancel = Отменить текущее действие
+
+# ===== Реестр заявок =====
+btn-registry-appeals = 🗂 Обращения
+btn-registry-complaints = 🗂 Жалобы
+registry-title = 🗂 { $type } · { $filter } · { $order }
+registry-empty = 📭 Заявок по этому фильтру нет.
+registry-item = { $n }. { $status } { $public_id } · { $author } · { $date }
+registry-page = Стр. { $page } из { $pages }
+registry-not-found = ⚠️ Заявка не найдена или была удалена.
+btn-filter-all = Все
+btn-filter-new = 🆕 Новые
+btn-filter-in-progress = 🟡 В работе
+btn-filter-closed = ✅ Закрытые
+btn-sort-newest = ↓ Сначала новые
+btn-sort-oldest = ↑ Сначала старые
+btn-back-to-list = ◀️ К списку
+cmd-appeals = Реестр обращений
+cmd-complaints = Реестр жалоб
