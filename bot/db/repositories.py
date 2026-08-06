@@ -165,6 +165,39 @@ class SubmissionRepository:
         won = await self.session.scalar(stmt)
         return won is not None
 
+    async def list_for_registry(
+        self,
+        *,
+        type_: SubmissionType,
+        status: SubmissionStatus | None = None,
+        order: str = "desc",
+        page: int = 0,
+        per_page: int = 5,
+    ) -> tuple[list[Submission], int]:
+        """One page of the registry plus the TOTAL row count (for "1/4").
+
+        ``type_`` is always applied: the caller has already checked the user may
+        see this type, and widening it here would grant unintended access.
+        """
+        filters = [Submission.type == type_]
+        if status is not None:
+            filters.append(Submission.status == status)
+
+        total = await self.session.scalar(
+            select(func.count()).select_from(Submission).where(*filters)
+        )
+        col = Submission.created_at
+        rows = list(
+            await self.session.scalars(
+                select(Submission)
+                .where(*filters)
+                .order_by(col.asc() if order == "asc" else col.desc())
+                .offset(max(page, 0) * per_page)
+                .limit(per_page)
+            )
+        )
+        return rows, int(total or 0)
+
     async def close(self, submission_id: int, user_id: int) -> str | None:
         """Close an open submission atomically.
 
