@@ -42,6 +42,41 @@ class RedisSettings(BaseSettings):
         return f"redis://{auth}{self.host}:{self.port}/{self.db}"
 
 
+class MatrixSettings(BaseSettings):
+    """Matrix (Element) bridge. Empty homeserver/user = bridge disabled.
+
+    Rooms are per submission type; membership of a room is what provisions a
+    User with the matching resp_<type> flag (see services/actions + matrix/bridge).
+    """
+
+    homeserver: str = ""
+    user: str = ""
+    password: SecretStr = SecretStr("")
+    token: SecretStr = SecretStr("")
+    room_appeal: str = ""
+    room_corruption: str = ""
+    locale: str = "uz_latn"
+    store_dir: str = "matrix_store"
+    device_name: str = "anticor-bot"
+
+    @property
+    def enabled(self) -> bool:
+        has_secret = bool(self.password.get_secret_value() or self.token.get_secret_value())
+        return bool(self.homeserver and self.user and has_secret)
+
+    def room_for(self, type_value: str) -> str:
+        """Room id for a SubmissionType value ('appeal' | 'corruption'), '' if unset."""
+        return self.room_appeal if type_value == "appeal" else self.room_corruption
+
+    def type_for_room(self, room_id: str) -> str | None:
+        """Inverse of room_for: which submission type a room serves, or None."""
+        if room_id and room_id == self.room_appeal:
+            return "appeal"
+        if room_id and room_id == self.room_corruption:
+            return "corruption"
+        return None
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -68,6 +103,7 @@ class Settings(BaseSettings):
     # Nested
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
+    matrix: MatrixSettings = Field(default_factory=MatrixSettings)
 
     # App
     debug: bool = False

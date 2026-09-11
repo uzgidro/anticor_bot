@@ -106,3 +106,42 @@ def test_run_migrations_on_startup_can_be_disabled(base_env, monkeypatch):
     # so replicas don't race to upgrade the same database.
     monkeypatch.setenv("RUN_MIGRATIONS_ON_STARTUP", "false")
     assert Settings().run_migrations_on_startup is False
+
+
+def test_matrix_disabled_by_default(base_env, monkeypatch):
+    from bot.config import Settings
+
+    for key in ("MATRIX__HOMESERVER", "MATRIX__USER", "MATRIX__PASSWORD", "MATRIX__TOKEN"):
+        monkeypatch.delenv(key, raising=False)
+    s = Settings(_env_file=None)
+    assert s.matrix.enabled is False
+    assert s.matrix.locale == "uz_latn"
+
+
+def test_matrix_enabled_with_password_or_token(base_env, monkeypatch):
+    from bot.config import Settings
+
+    monkeypatch.setenv("MATRIX__HOMESERVER", "https://matrix.example.uz")
+    monkeypatch.setenv("MATRIX__USER", "@bot:example.uz")
+    monkeypatch.setenv("MATRIX__PASSWORD", "pw")
+    s = Settings(_env_file=None)
+    assert s.matrix.enabled is True
+    assert "pw" not in repr(s.matrix)  # secrets never leak through repr
+
+    monkeypatch.delenv("MATRIX__PASSWORD")
+    monkeypatch.setenv("MATRIX__TOKEN", "syt_abc")
+    s = Settings(_env_file=None)
+    assert s.matrix.enabled is True
+
+
+def test_matrix_room_mapping(base_env, monkeypatch):
+    from bot.config import Settings
+
+    monkeypatch.setenv("MATRIX__ROOM_APPEAL", "!a:example.uz")
+    monkeypatch.setenv("MATRIX__ROOM_CORRUPTION", "!c:example.uz")
+    s = Settings(_env_file=None)
+    assert s.matrix.room_for("appeal") == "!a:example.uz"
+    assert s.matrix.room_for("corruption") == "!c:example.uz"
+    assert s.matrix.type_for_room("!a:example.uz") == "appeal"
+    assert s.matrix.type_for_room("!c:example.uz") == "corruption"
+    assert s.matrix.type_for_room("!other:example.uz") is None
