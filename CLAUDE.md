@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Telegram bot for AO "Uzbekgidroenergo": citizen appeals (`appeal`) and anti-corruption complaints (`corruption`), the latter optionally **anonymous**. 5 locales, role-routed to responsible persons, statuses + replies back to the applicant, full audit trail.
 
-Stack: Python 3.11+, aiogram 3.x, aiogram-i18n + Fluent, SQLAlchemy 2.0 async (asyncpg) + Alembic, Redis (FSM + throttling).
+Stack: Python 3.11+, aiogram 3.x, aiogram-i18n + Fluent, SQLAlchemy 2.0 async (asyncpg) + Alembic, Redis (FSM + throttling). Optional Matrix (Element) bridge via matrix-nio.
 
 User-facing text (README, locales, plan docs) is Russian; code and comments are English. Keep that split.
 
@@ -90,6 +90,33 @@ A browsable list for responsibles/admins — a new **entry point to existing rig
 Filter/sort/page state lives in `RegistryCb` (43 bytes worst case, Telegram's cap is 64) rather than FSM, so it never collides with `SubmissionForm` and survives a restart. `registry.py` must not import `responsible.py` — the dependency is one-way, enforced by a test.
 
 `set_personal_commands()` uses `BotCommandScopeChat`, which **replaces** the whole list for that chat: it re-sends the base commands with the registry ones, and deletes the scope when the last role is revoked.
+
+### Matrix bridge ([bot/matrix/](bot/matrix/))
+
+A second channel for responsibles, on the same rights. Take/close/reply live
+**once** in [services/actions.py](bot/services/actions.py) (`SubmissionActions`);
+`handlers/responsible.py` and `matrix/bridge.py` are adapters over it. Never
+put a second copy of those sequences anywhere.
+
+- `users.tg_id` is **nullable**: a room member is provisioned as a `User` with
+  `matrix_id` on first action (`UserRepository.get_or_create_matrix`), role =
+  the room's type. `responsibles_for()` excludes `tg_id IS NULL` — never send
+  Telegram messages to Matrix-only users. `CHECK ck_users_identity` requires
+  one of the two ids.
+- Authorization is still `SubmissionActions.authorize()` with the type taken
+  from the submission row — a card addressed from the wrong room grants
+  nothing. `authorize()` re-reads the row because `try_claim`/`close` are Core
+  UPDATEs that bypass the identity map.
+- Reply resolution is room-scoped (`matrix_deliveries(room_id, event_id)`).
+- Cross-channel redraw goes through the `CardSink` protocol; handlers get
+  `card_sinks` from dispatcher context and never import `bot.matrix`
+  ([tests/test_matrix_architecture.py](tests/test_matrix_architecture.py)).
+- Matrix events run outside the middleware chain: the bridge opens its own
+  session per event (commit/rollback like `DbSessionMiddleware`).
+- Rooms are unencrypted (no `[e2e]` extra, no libolm). Room strings are
+  `mx-*` keys in all five `.ftl` files, rendered in `MATRIX__LOCALE`.
+- Local Python here may be older than 3.11; run the suite in Docker
+  (`python:3.12-slim`, `pip install -e .[dev]`, then `ruff check bot tests && pytest -q`).
 
 ### Multi-locale messaging
 
