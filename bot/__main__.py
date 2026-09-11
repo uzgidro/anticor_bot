@@ -30,14 +30,41 @@ async def main() -> None:
 
     bot, dp, redis, engine = build(settings)
     core = dp["i18n_core"]
+    bridge_task: asyncio.Task | None = None
     try:
         await core.startup()
         await set_commands(bot, core, settings.locales, settings.default_locale)
+
+        # Matrix (Element) bridge — a second channel for responsibles. Runs as a
+        # background task in this same process; if it cannot connect, the bot
+        # keeps serving Telegram and the bridge retries on its own.
+        if settings.matrix.enabled:
+            from bot.db.session import create_session_pool
+            from bot.matrix.bridge import MatrixBridge
+            from bot.matrix.client import MatrixClient
+            from bot.security.crypto import AnonCipher
+
+            bridge = MatrixBridge(
+                MatrixClient(settings.matrix), settings.matrix, create_session_pool(engine),
+                bot, core, AnonCipher(settings.anon_enc_key), settings.default_locale,
+            )
+            dp["card_sinks"].append(bridge)
+            bridge_task = asyncio.create_task(bridge.run(), name="matrix-bridge")
+            logger.info("Matrix bridge enabled (locale=%s)", settings.matrix.locale)
+        else:
+            logger.info("Matrix bridge disabled (MATRIX__* not set)")
+
         if settings.use_webhook:
             await run_webhook(bot, dp, settings)
         else:
             await run_polling(bot, dp, settings)
     finally:
+        if bridge_task is not None:
+            bridge_task.cancel()
+            try:
+                await bridge_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
         # Always release resources even if startup (set_commands etc.) fails.
         await bot.session.close()
         await redis.aclose()
