@@ -206,3 +206,17 @@ async def test_audit_log(session):
     rows = list(await session.scalars(select(AuditLog)))
     assert len(rows) == 1
     assert rows[0].action == "assign_role"
+
+
+async def test_user_needs_at_least_one_identity(session):
+    from sqlalchemy.exc import IntegrityError
+
+    from bot.db.models import User
+
+    session.add(User(full_name="nobody"))
+    with pytest.raises(IntegrityError):
+        await session.flush()
+    await session.rollback()
+
+    session.add(User(matrix_id="@nodir:example.uz", full_name="Nodir"))
+    await session.flush()  # tg_id may be NULL when matrix_id is present
