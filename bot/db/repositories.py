@@ -19,6 +19,7 @@ from bot.db.models import (
     AnonDeliveryRef,
     AttachmentType,
     AuditLog,
+    MatrixDelivery,
     Submission,
     SubmissionAttachment,
     SubmissionStatus,
@@ -63,13 +64,53 @@ class UserRepository:
             return existing, False
         return user, True
 
+    async def get_by_matrix_id(self, matrix_id: str) -> User | None:
+        return await self.session.scalar(select(User).where(User.matrix_id == matrix_id))
+
+    async def get_or_create_matrix(
+        self, matrix_id: str, full_name: str | None, type_: SubmissionType
+    ) -> tuple[User, bool]:
+        """Provision a room member as a User on first sight.
+
+        Room membership is the only grant: a member of the appeal room gets
+        resp_appeal, of the corruption room resp_corruption. The flag is ensured
+        on every call, so one person acting in both rooms ends up with both.
+        Matrix-only users are never admins.
+        """
+        user = await self.get_by_matrix_id(matrix_id)
+        created = False
+        if user is None:
+            user = User(matrix_id=matrix_id, full_name=full_name)
+            self.session.add(user)
+            try:
+                await self.session.flush()
+            except IntegrityError:
+                await self.session.rollback()
+                existing = await self.get_by_matrix_id(matrix_id)
+                if existing is None:
+                    raise
+                user = existing
+            else:
+                created = True
+        flag = "resp_appeal" if type_ == SubmissionType.appeal else "resp_corruption"
+        if not getattr(user, flag):
+            setattr(user, flag, True)
+            await self.session.flush()
+        return user, created
+
     async def set_language(self, user: User, language: str) -> None:
         user.language = language
         await self.session.flush()
 
     async def responsibles_for(self, type_: SubmissionType) -> list[User]:
+        """Responsibles reachable in Telegram. Matrix-only users (tg_id NULL)
+        get their cards through the Matrix bridge instead."""
         col = User.resp_appeal if type_ == SubmissionType.appeal else User.resp_corruption
-        return list(await self.session.scalars(select(User).where(col.is_(True))))
+        return list(
+            await self.session.scalars(
+                select(User).where(col.is_(True), User.tg_id.is_not(None))
+            )
+        )
 
 
 class SubmissionRepository:
@@ -265,3 +306,33 @@ class AuditRepository:
             AuditLog(action=action, actor_user_id=actor_user_id, target=target, meta=meta)
         )
         await self.session.flush()
+
+
+class MatrixDeliveryRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(
+        self, submission_id: int, room_id: str, event_id: str, kind: str
+    ) -> MatrixDelivery:
+        row = MatrixDelivery(
+            submission_id=submission_id, room_id=room_id, event_id=event_id, kind=kind
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def submission_id_for(self, room_id: str, event_id: str) -> int | None:
+        return await self.session.scalar(
+            select(MatrixDelivery.submission_id).where(
+                MatrixDelivery.room_id == room_id, MatrixDelivery.event_id == event_id
+            )
+        )
+
+    async def card_for(self, submission_id: int) -> MatrixDelivery | None:
+        return await self.session.scalar(
+            select(MatrixDelivery)
+            .where(MatrixDelivery.submission_id == submission_id, MatrixDelivery.kind == "card")
+            .order_by(MatrixDelivery.id.desc())
+            .limit(1)
+        )

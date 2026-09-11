@@ -96,6 +96,10 @@ def create_dispatcher(
     # Expose settings and the i18n core to handlers / startup.
     dp["settings"] = settings
     dp["i18n_core"] = core
+    # Channels that display submission cards besides Telegram push cards. The
+    # Matrix bridge appends itself at startup (see bot/__main__.py); handlers
+    # receive this list by name and pass it to SubmissionActions.
+    dp["card_sinks"] = []
 
     async def _on_shutdown() -> None:
         await redis.aclose()

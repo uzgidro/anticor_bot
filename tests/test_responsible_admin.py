@@ -99,6 +99,7 @@ async def env():
     dp.update.outer_middleware(_StubI18nMw())
     dp.include_router(root)
     dp["settings"] = settings
+    dp["card_sinks"] = []
 
     bot = AsyncMock()
     bot.id = 1

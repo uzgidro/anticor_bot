@@ -1,9 +1,9 @@
 """Responsible-person reactions: take in progress, reply, close.
 
-Authorization is enforced per click at the object level (the user must be
-responsible for THIS submission's type, or an admin) — callback data is
-client-supplied and never trusted alone. Status changes are atomic; on a
-successful claim/close every delivered card is updated for all responsibles.
+Thin adapter: parse the CallbackQuery, call SubmissionActions (the single
+implementation shared with the Matrix bridge), answer the query, and redraw
+the registry screen if the click came from there. Authorization lives in
+SubmissionActions.authorize — callback data is never trusted for authz.
 """
 from __future__ import annotations
 
@@ -14,77 +14,41 @@ from aiogram_i18n import I18nContext
 
 from bot.config import Settings
 from bot.db.models import User
-from bot.db.repositories import AuditRepository, SubmissionRepository
 from bot.filters.roles import can_handle_type
 from bot.handlers import registry
 from bot.handlers.states import ResponseForm
 from bot.keyboards.inline import ReactionCb
 from bot.security.crypto import AnonCipher
-from bot.services.submissions import SubmissionService, safe_send
-from bot.utils.text import escape
+from bot.services.actions import SubmissionActions
 
 router = Router(name="responsible")
 
 
-def _service(session, settings: Settings) -> SubmissionService:
-    return SubmissionService(session, AnonCipher(settings.anon_enc_key))
-
-
-async def _authorize(
-    query: CallbackQuery, submission_id: int, db_user: User, session, i18n: I18nContext,
-    *, require_owner: bool = False,
-):
-    """Return the submission if the user may act on it, else answer and None.
-
-    Authorization is derived server-side: the user must be responsible for THIS
-    submission's type (or admin). When ``require_owner`` is set (reply/close),
-    the user must also be the assignee (the one who took it) or an admin — the
-    model is first-claim ownership, so colleagues can't act on each other's
-    cases. Callback data is never trusted for authz.
-    """
-    sub = await SubmissionRepository(session).get(submission_id)
-    if sub is None or not can_handle_type(db_user, sub.type):
-        await query.answer(i18n.get("admin-only"), show_alert=True)
-        return None
-    if require_owner and not db_user.is_admin:
-        if sub.assigned_to_user_id not in (None, db_user.id):
-            await query.answer(i18n.get("admin-only"), show_alert=True)
-            return None
-    return sub
+def _actions(session, settings: Settings, bot, core, card_sinks) -> SubmissionActions:
+    return SubmissionActions(
+        session, bot, core, AnonCipher(settings.anon_enc_key),
+        settings.default_locale, sinks=card_sinks or (),
+    )
 
 
 @router.callback_query(ReactionCb.filter(F.action == "take"))
 async def on_take(
     query: CallbackQuery, callback_data: ReactionCb, db_user: User, session,
-    i18n: I18nContext, settings: Settings,
+    i18n: I18nContext, settings: Settings, card_sinks: list | None = None,
 ) -> None:
-    svc = _service(session, settings)
-    sub = await _authorize(query, callback_data.submission_id, db_user, session, i18n)
+    actions = _actions(session, settings, query.bot, i18n.core, card_sinks)
+    sub = await actions.authorize(callback_data.submission_id, db_user)
     if sub is None:
+        await query.answer(i18n.get("admin-only"), show_alert=True)
         return
-    won = await svc.repo.try_claim(sub.id, db_user.id)
-    if not won:
-        # Someone else already took it; tell this user who.
-        fresh = await session.get(type(sub), sub.id, populate_existing=True)
-        assignee = (
-            await session.get(User, fresh.assigned_to_user_id)
-            if fresh and fresh.assigned_to_user_id else None
+    result = await actions.take(sub, db_user)
+    if not result.won:
+        await query.answer(
+            i18n.get("cb-already-taken", name=result.assignee_name), show_alert=True
         )
-        name = escape(assignee.full_name) if assignee and assignee.full_name else "—"
-        await query.answer(i18n.get("cb-already-taken", name=name), show_alert=True)
         return
-    await svc.repo.record_status_event(sub.id, db_user.id, "new", "in_progress")
-    await AuditRepository(session).log(
-        action="status_change", actor_user_id=db_user.id, target=f"submission:{sub.id}",
-        meta="new->in_progress",
-    )
-    await session.commit()
-    # Update the card for everyone, showing who took it.
-    taker = escape(db_user.full_name) if db_user.full_name else "—"
-    await svc.update_all_cards(query.bot, i18n.core, sub, "card-assigned", name=taker)
-    await session.commit()
     # If the click came from the registry, redraw that screen too — the card
-    # update above only touches the push cards.
+    # update inside take() only touches the push cards.
     await registry.refresh_detail(query, i18n, session, sub.id)
     await query.answer(i18n.get("cb-taken"))
 
@@ -92,34 +56,14 @@ async def on_take(
 @router.callback_query(ReactionCb.filter(F.action == "close"))
 async def on_close(
     query: CallbackQuery, callback_data: ReactionCb, db_user: User, session,
-    i18n: I18nContext, settings: Settings,
+    i18n: I18nContext, settings: Settings, card_sinks: list | None = None,
 ) -> None:
-    svc = _service(session, settings)
-    sub = await _authorize(
-        query, callback_data.submission_id, db_user, session, i18n, require_owner=True
-    )
+    actions = _actions(session, settings, query.bot, i18n.core, card_sinks)
+    sub = await actions.authorize(callback_data.submission_id, db_user, require_owner=True)
     if sub is None:
+        await query.answer(i18n.get("admin-only"), show_alert=True)
         return
-    prev = await svc.repo.close(sub.id, db_user.id)
-    if prev is None:
-        await query.answer(i18n.get("cb-closed"))
-        return
-    await svc.repo.record_status_event(sub.id, db_user.id, prev, "closed")
-    await AuditRepository(session).log(
-        action="status_change", actor_user_id=db_user.id, target=f"submission:{sub.id}",
-        meta=f"{prev}->closed",
-    )
-    await session.commit()
-    await svc.update_all_cards(
-        query.bot, i18n.core, sub, "status-closed"
-    )
-    # Notify the applicant their submission was closed.
-    chat_id = await svc.resolve_author_chat_id(sub)
-    if chat_id is not None:
-        locale = await _author_locale(session, sub)
-        text = i18n.core.get("submission-closed-notify", locale, public_id=sub.public_id)
-        await safe_send(query.bot, chat_id, text)
-    await session.commit()
+    await actions.close(sub, db_user)  # False = already closed; same answer either way
     await registry.refresh_detail(query, i18n, session, sub.id)
     await query.answer(i18n.get("cb-closed"))
 
@@ -128,11 +72,12 @@ async def on_close(
 async def on_reply_start(
     query: CallbackQuery, callback_data: ReactionCb, db_user: User, session,
     i18n: I18nContext, state: FSMContext, settings: Settings,
+    card_sinks: list | None = None,
 ) -> None:
-    sub = await _authorize(
-        query, callback_data.submission_id, db_user, session, i18n, require_owner=True
-    )
+    actions = _actions(session, settings, query.bot, i18n.core, card_sinks)
+    sub = await actions.authorize(callback_data.submission_id, db_user, require_owner=True)
     if sub is None:
+        await query.answer(i18n.get("admin-only"), show_alert=True)
         return
     await state.set_state(ResponseForm.text)
     await state.update_data(submission_id=sub.id)
@@ -147,42 +92,15 @@ async def on_reply_start(
 @router.message(ResponseForm.text, F.text)
 async def on_reply_text(
     message: Message, db_user: User, session, i18n: I18nContext,
-    state: FSMContext, settings: Settings,
+    state: FSMContext, settings: Settings, card_sinks: list | None = None,
 ) -> None:
     data = await state.get_data()
     submission_id = data["submission_id"]
     await state.clear()
-    svc = _service(session, settings)
-    sub = await svc.repo.get(submission_id)
+    actions = _actions(session, settings, message.bot, i18n.core, card_sinks)
+    sub = await actions.svc.repo.get(submission_id)
     if sub is None or not can_handle_type(db_user, sub.type):
         await message.answer(i18n.get("admin-only"))
         return
-
-    from bot.db.models import SubmissionResponse
-
-    session.add(
-        SubmissionResponse(
-            submission_id=sub.id, responder_user_id=db_user.id, text=message.text
-        )
-    )
-    await AuditRepository(session).log(
-        action="reply", actor_user_id=db_user.id, target=f"submission:{sub.id}"
-    )
-    await session.commit()
-
-    chat_id = await svc.resolve_author_chat_id(sub)
-    if chat_id is not None:
-        locale = await _author_locale(session, sub)
-        header = i18n.core.get("reply-to-author", locale, public_id=sub.public_id)
-        body = i18n.core.get("reply-to-author-body", locale, text=escape(message.text))
-        await safe_send(message.bot, chat_id, f"{header}\n{body}")
+    await actions.reply(sub, db_user, message.text)
     await message.answer(i18n.get("reply-sent"))
-
-
-async def _author_locale(session, sub) -> str:
-    """Resolve the applicant's locale (for non-anonymous); default ru otherwise."""
-    if sub.author_user_id is not None:
-        author = await session.get(User, sub.author_user_id)
-        if author and author.language:
-            return author.language
-    return "ru"

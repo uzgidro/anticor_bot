@@ -124,3 +124,17 @@ btn-sort-oldest = ↑ Аввал эскилари
 btn-back-to-list = ◀️ Рўйхатга
 cmd-appeals = Мурожаатлар реестри
 cmd-complaints = Шикоятлар реестри
+
+## Matrix (Element) room
+mx-attachments = 📎 Иловалар: { $count }
+mx-attachment-failed = ⚠️ { $count } та иловани юклаб бўлмади (20 MB дан катта ёки хато)
+mx-assignee = 👤 Ижрочи: { $name }
+mx-hint-take = ▶️ Ишга олиш: шу хабарга reply қилиб <code>!olish</code>
+mx-hint-reply = ✍️ Жавоб: шу хабарга reply қилиб матн ёзинг
+mx-hint-close = ✅ Ёпиш: шу хабарга reply қилиб <code>!yopish</code>
+mx-hint-card = 🔄 Карточка: <code>!karta</code>
+mx-not-owner = ⚠️ Бу мурожаатни { $name } кўриб чиқмоқда — фақат у ёпиши ёки жавоб бериши мумкин
+mx-already-closed = ℹ️ Мурожаат аллақачон ёпилган
+mx-forbidden = ⚠️ Бу турдаги мурожаатлар учун сизда ҳуқуқ йўқ
+mx-reply-undeliverable = ⚠️ Мурожаатчига етказиб бўлмади (у ботни блоклаган бўлиши мумкин). Жавоб сақланди.
+mx-help = <b>Буйруқлар</b> (карточкага reply қилиб):<br/>• матн — мурожаатчига жавоб<br/>• <code>!olish</code> — ишга олиш<br/>• <code>!yopish</code> — ёпиш<br/>• <code>!karta</code> — карточкани қайта кўрсатиш<br/>• <code>!yordam</code> — шу рўйхат

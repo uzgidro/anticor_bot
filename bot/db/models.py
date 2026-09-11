@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -54,9 +55,18 @@ class TimestampMixin:
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # A user is either a Telegram user, a Matrix user, or both — never neither.
+        CheckConstraint("tg_id IS NOT NULL OR matrix_id IS NOT NULL", name="ck_users_identity"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
+    # Telegram identity. NULL for users provisioned from a Matrix room.
+    tg_id: Mapped[int | None] = mapped_column(
+        BigInteger, unique=True, index=True, nullable=True
+    )
+    # Matrix identity (@user:server). NULL for Telegram-only users.
+    matrix_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     language: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -155,6 +165,29 @@ class SubmissionDelivery(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     delivered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MatrixDelivery(Base):
+    """An event the bot posted to a Matrix room about a submission.
+
+    ``kind='card'`` is the editable card; ``attachment`` and ``note`` are the
+    other bot events for the same submission. A reply to ANY of them resolves
+    to the submission (see MatrixDeliveryRepository.submission_id_for).
+    """
+
+    __tablename__ = "matrix_deliveries"
+    __table_args__ = (UniqueConstraint("room_id", "event_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    room_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="card")
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

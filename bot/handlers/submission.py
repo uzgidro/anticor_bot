@@ -1,6 +1,7 @@
 """Citizen submission FSM: appeal / corruption form with navigation & validation."""
 from __future__ import annotations
 
+import logging
 import re
 
 from aiogram import F, Router
@@ -29,6 +30,8 @@ from bot.services.submissions import (
     SubmissionService,
 )
 from bot.utils.text import MAX_INPUT_LEN, escape, split_text
+
+logger = logging.getLogger(__name__)
 
 router = Router(name="submission")
 
@@ -247,6 +250,7 @@ async def on_submit(
     db_user: User,
     session,
     settings: Settings,
+    card_sinks: list | None = None,
 ) -> None:
     from bot.security.crypto import AnonCipher
 
@@ -287,6 +291,16 @@ async def on_submit(
         query.bot, i18n.core, sub, default_locale=settings.default_locale
     )
     await session.commit()  # persist SubmissionDelivery rows
+
+    # Other channels (the Matrix rooms). A card there counts as a delivery:
+    # on machines where Telegram is blocked it may be the only one.
+    for sink in card_sinks or ():
+        try:
+            if await sink.announce(session, sub.id):
+                delivered += 1
+        except Exception:  # noqa: BLE001 — a sink must never break the submission
+            logger.exception("card sink announce failed")
+    await session.commit()
 
     if delivered:
         await query.message.answer(

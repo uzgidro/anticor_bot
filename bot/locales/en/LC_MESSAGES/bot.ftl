@@ -124,3 +124,17 @@ btn-sort-oldest = ↑ Oldest first
 btn-back-to-list = ◀️ Back to list
 cmd-appeals = Appeals registry
 cmd-complaints = Complaints registry
+
+## Matrix (Element) room
+mx-attachments = 📎 Attachments: { $count }
+mx-attachment-failed = ⚠️ { $count } attachment(s) could not be uploaded (over 20 MB or an error)
+mx-assignee = 👤 Assignee: { $name }
+mx-hint-take = ▶️ Take: reply to this message with <code>!olish</code>
+mx-hint-reply = ✍️ Answer the applicant: reply to this message with text
+mx-hint-close = ✅ Close: reply to this message with <code>!yopish</code>
+mx-hint-card = 🔄 Card: <code>!karta</code>
+mx-not-owner = ⚠️ { $name } is handling this — only they can close or answer it
+mx-already-closed = ℹ️ Already closed
+mx-forbidden = ⚠️ You are not allowed to handle this type of submission
+mx-reply-undeliverable = ⚠️ Could not deliver to the applicant (they may have blocked the bot). The answer was saved.
+mx-help = <b>Commands</b> (as a reply to a card):<br/>• text — answer the applicant<br/>• <code>!olish</code> — take<br/>• <code>!yopish</code> — close<br/>• <code>!karta</code> — show the card again<br/>• <code>!yordam</code> — this help

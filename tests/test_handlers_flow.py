@@ -198,3 +198,37 @@ async def test_double_submit_creates_single_submission(harness):
     async with pool() as s:
         subs = list(await s.scalars(select(Submission)))
     assert len(subs) == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_announces_to_card_sinks(harness):
+    """A configured sink receives the new submission and counts as a delivery
+    even when there is no Telegram responsible."""
+    dp, bot, pool = harness.dp, harness.bot, harness.pool
+    announced = []
+
+    class Sink:
+        async def announce(self, session, submission_id):
+            announced.append(submission_id)
+            return True
+
+        async def refresh(self, session, submission_id):
+            pass
+
+    dp["card_sinks"] = [Sink()]
+
+    await dp.feed_update(bot, _cb("menu:appeal"))
+    await dp.feed_update(bot, _text("Ivan Ivanov"))
+    await dp.feed_update(bot, _text("+998901112233"))
+    await dp.feed_update(bot, _text("Water outage in my district."))
+    await dp.feed_update(bot, _cb("form:skip"))
+    await dp.feed_update(bot, _cb("form:submit"))
+
+    async with pool() as s:
+        sub = (await s.scalars(select(Submission))).one()
+    assert announced == [sub.id]
+    # With a sink delivery the applicant gets the normal confirmation, not the
+    # "no responsible" notice (there are no Telegram responsibles here).
+    sent = [c.args[1] if len(c.args) > 1 else c.kwargs.get("text", "")
+            for c in bot.send_message.await_args_list]
+    assert not any("no-responsible" in str(t) for t in sent)

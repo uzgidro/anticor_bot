@@ -91,3 +91,19 @@ async def test_run_upgrade_gives_up_after_retries(tmp_path, monkeypatch):
     url, _ = _sqlite_url(tmp_path)
     with pytest.raises(OSError):
         await migrate_mod.run_upgrade_to_head(url, retries=2, delay=0.01)
+
+
+def test_upgrade_adds_matrix_schema(tmp_path):
+    """Revision 0002: users.matrix_id, nullable tg_id, matrix_deliveries."""
+    url, db_path = _sqlite_url(tmp_path)
+    upgrade_to_head(url)
+
+    con = sqlite3.connect(db_path)
+    try:
+        cols = {row[1]: row for row in con.execute("PRAGMA table_info(users)")}
+        assert "matrix_id" in cols
+        assert cols["tg_id"][3] == 0  # notnull flag == 0 -> nullable
+        tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "matrix_deliveries" in tables
+    finally:
+        con.close()
