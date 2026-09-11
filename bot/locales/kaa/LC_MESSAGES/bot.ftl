@@ -125,3 +125,17 @@ btn-sort-oldest = ↑ Aldın eskileri
 btn-back-to-list = ◀️ Dizimge
 cmd-appeals = Múrájatlar reestri
 cmd-complaints = Shaǵımlar reestri
+
+## Matrix (Element) room
+mx-attachments = 📎 Qosımshalar: { $count }
+mx-attachment-failed = ⚠️ { $count } qosımshanı júklep bolmadı (20 MB dan úlken yamasa qáte)
+mx-assignee = 👤 Orınlawshı: { $name }
+mx-hint-take = ▶️ Jumısqa alıw: usı xabarǵa reply etip <code>!olish</code>
+mx-hint-reply = ✍️ Juwap: usı xabarǵa reply etip tekst jazıń
+mx-hint-close = ✅ Jabıw: usı xabarǵa reply etip <code>!yopish</code>
+mx-hint-card = 🔄 Kartochka: <code>!karta</code>
+mx-not-owner = ⚠️ Bul múrájatti { $name } qarap atır — tek ol jaba aladı yamasa juwap bere aladı
+mx-already-closed = ℹ️ Múrájat álle qashan jabılǵan
+mx-forbidden = ⚠️ Bul túrdegi múrájatlar ushın sizde huqıq joq
+mx-reply-undeliverable = ⚠️ Múrájat iyesine jetkerip bolmadı (ol bottı bloklaǵan bolıwı múmkin). Juwap saqlandı.
+mx-help = <b>Buyrıqlar</b> (kartochkaǵa reply etip):<br/>• tekst — múrájat iyesine juwap<br/>• <code>!olish</code> — jumısqa alıw<br/>• <code>!yopish</code> — jabıw<br/>• <code>!karta</code> — kartochkanı qayta kórsetiw<br/>• <code>!yordam</code> — usı dizim

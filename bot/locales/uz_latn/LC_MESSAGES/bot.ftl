@@ -124,3 +124,17 @@ btn-sort-oldest = ↑ Avval eskilari
 btn-back-to-list = ◀️ Roʻyxatga
 cmd-appeals = Murojaatlar reyestri
 cmd-complaints = Shikoyatlar reyestri
+
+## Matrix (Element) room
+mx-attachments = 📎 Ilovalar: { $count }
+mx-attachment-failed = ⚠️ { $count } ta ilovani yuklab boʻlmadi (20 MB dan katta yoki xato)
+mx-assignee = 👤 Ijrochi: { $name }
+mx-hint-take = ▶️ Ishga olish: shu xabarga reply qilib <code>!olish</code>
+mx-hint-reply = ✍️ Javob: shu xabarga reply qilib matn yozing
+mx-hint-close = ✅ Yopish: shu xabarga reply qilib <code>!yopish</code>
+mx-hint-card = 🔄 Kartochka: <code>!karta</code>
+mx-not-owner = ⚠️ Bu murojaatni { $name } koʻrib chiqmoqda — faqat u yopishi yoki javob berishi mumkin
+mx-already-closed = ℹ️ Murojaat allaqachon yopilgan
+mx-forbidden = ⚠️ Bu turdagi murojaatlar uchun sizda huquq yoʻq
+mx-reply-undeliverable = ⚠️ Murojaatchiga yetkazib boʻlmadi (u botni bloklagan boʻlishi mumkin). Javob saqlandi.
+mx-help = <b>Buyruqlar</b> (kartochkaga reply qilib):<br/>• matn — murojaatchiga javob<br/>• <code>!olish</code> — ishga olish<br/>• <code>!yopish</code> — yopish<br/>• <code>!karta</code> — kartochkani qayta koʻrsatish<br/>• <code>!yordam</code> — shu roʻyxat

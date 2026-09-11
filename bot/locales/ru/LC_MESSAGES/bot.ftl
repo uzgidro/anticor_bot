@@ -124,3 +124,17 @@ btn-sort-oldest = ↑ Сначала старые
 btn-back-to-list = ◀️ К списку
 cmd-appeals = Реестр обращений
 cmd-complaints = Реестр жалоб
+
+## Matrix (Element) room
+mx-attachments = 📎 Вложения: { $count }
+mx-attachment-failed = ⚠️ Не удалось загрузить вложений: { $count } (больше 20 МБ или ошибка)
+mx-assignee = 👤 Исполнитель: { $name }
+mx-hint-take = ▶️ Взять в работу: ответьте на это сообщение <code>!olish</code>
+mx-hint-reply = ✍️ Ответ заявителю: ответьте на это сообщение текстом
+mx-hint-close = ✅ Закрыть: ответьте на это сообщение <code>!yopish</code>
+mx-hint-card = 🔄 Карточка: <code>!karta</code>
+mx-not-owner = ⚠️ Заявку ведёт { $name } — закрыть или ответить может только он
+mx-already-closed = ℹ️ Заявка уже закрыта
+mx-forbidden = ⚠️ У вас нет прав на заявки этого типа
+mx-reply-undeliverable = ⚠️ Не удалось доставить заявителю (возможно, бот заблокирован). Ответ сохранён.
+mx-help = <b>Команды</b> (ответом на карточку):<br/>• текст — ответ заявителю<br/>• <code>!olish</code> — взять в работу<br/>• <code>!yopish</code> — закрыть<br/>• <code>!karta</code> — показать карточку заново<br/>• <code>!yordam</code> — эта справка
