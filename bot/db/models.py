@@ -67,6 +67,11 @@ class User(TimestampMixin, Base):
     )
     # Matrix identity (@user:server). NULL for Telegram-only users.
     matrix_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    # The 1:1 room with the bot where this user's cards are delivered. NULL
+    # until the user writes to the bot or the bot creates the DM on first card.
+    matrix_room_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True
+    )
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     language: Mapped[str | None] = mapped_column(String(16), nullable=True)
