@@ -7,6 +7,8 @@ role grants the admin performs.
 """
 from __future__ import annotations
 
+import re
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
@@ -26,23 +28,37 @@ router.message.filter(IsAdmin())
 router.callback_query.filter(IsAdmin())
 
 
-def _target_tg_id(message: Message) -> int | None:
-    """Extract the target user's tg_id from a forwarded message or an argument."""
+_MATRIX_ID_RE = re.compile(r"^@[^:\s]+:[^\s]+$")
+
+
+def _target(message: Message) -> tuple[str, int | str] | None:
+    """Who the admin is assigning: ('tg', id) from a forwarded message or a
+    numeric argument, ('matrix', '@user:server') from a Matrix id argument."""
     if message.forward_from is not None:
-        return message.forward_from.id
+        return "tg", message.forward_from.id
     parts = (message.text or "").split()
-    if len(parts) >= 2 and parts[1].lstrip("-").isdigit():
-        return int(parts[1])
+    if len(parts) < 2:
+        return None
+    arg = parts[1]
+    if arg.lstrip("-").isdigit():
+        return "tg", int(arg)
+    if _MATRIX_ID_RE.match(arg):
+        return "matrix", arg
     return None
 
 
 @router.message(Command("assign"))
 async def cmd_assign(message: Message, i18n: I18nContext, session) -> None:
-    tg_id = _target_tg_id(message)
-    if tg_id is None:
+    target = _target(message)
+    if target is None:
         await message.answer(i18n.get("admin-assign-usage"))
         return
-    user, _ = await UserRepository(session).get_or_create(tg_id=tg_id)
+    kind, ident = target
+    repo = UserRepository(session)
+    if kind == "tg":
+        user, _ = await repo.get_or_create(tg_id=ident)
+    else:
+        user, _ = await repo.get_or_create_by_matrix_id(ident)
     await message.answer(
         i18n.get("admin-assign-choose-type"),
         reply_markup=assign_type_keyboard(i18n, user.id),
@@ -69,7 +85,8 @@ async def on_assign_type(
     )
     await session.commit()
     await _refresh_commands(query, target, i18n.core, settings.default_locale)
-    await query.message.edit_text(i18n.get("admin-assigned", user=str(target.tg_id)))
+    label = str(target.tg_id or target.matrix_id)
+    await query.message.edit_text(i18n.get("admin-assigned", user=label))
     await query.answer()
 
 
@@ -143,6 +160,8 @@ async def _refresh_commands(
     """
     from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
+    if target.tg_id is None:
+        return  # Matrix-only user: no Telegram chat scope to update
     try:
         await set_personal_commands(query.bot, core, target, default_locale)
     except (TelegramBadRequest, TelegramForbiddenError):

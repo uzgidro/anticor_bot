@@ -275,3 +275,47 @@ async def test_close_requires_ownership(env):
     async with env.pool() as s:
         sub = await s.get(Submission, sub_id)
         assert sub.status == SubmissionStatus.in_progress  # NOT closed
+
+
+def _answers(env):
+    """Texts + markups the handlers answered with (message.answer -> bot(SendMessage))."""
+    from aiogram.methods import SendMessage
+
+    return [
+        (c.args[0].text, c.args[0].reply_markup)
+        for c in env.bot.await_args_list
+        if c.args and isinstance(c.args[0], SendMessage)
+    ]
+
+
+async def test_assign_by_matrix_id_creates_user_and_grants_role(env):
+    await env.dp.feed_update(env.bot, _text("/assign @uge132:gidro.uz"))
+
+    async with env.pool() as s:
+        target = await s.scalar(select(User).where(User.matrix_id == "@uge132:gidro.uz"))
+        assert target is not None and target.tg_id is None
+        assert (target.resp_appeal, target.resp_corruption) == (False, False)
+        target_id = target.id
+    text, kb = _answers(env)[-1]
+    assert text == "admin-assign-choose-type"
+    assert any(
+        f"assign:{target_id}:" in b.callback_data for row in kb.inline_keyboard for b in row
+    )
+
+    env.bot.set_my_commands.reset_mock()
+    env.bot.delete_my_commands.reset_mock()
+    await env.dp.feed_update(env.bot, _cb(f"assign:{target_id}:corruption"))
+
+    async with env.pool() as s:
+        t = await s.get(User, target_id)
+        assert t.resp_corruption is True
+    # No Telegram chat scope exists for a Matrix-only user: never touch the menu.
+    env.bot.set_my_commands.assert_not_awaited()
+    env.bot.delete_my_commands.assert_not_awaited()
+
+
+async def test_assign_rejects_garbage_argument(env):
+    await env.dp.feed_update(env.bot, _text("/assign nonsense"))
+    assert _answers(env)[-1][0] == "admin-assign-usage"
+    async with env.pool() as s:
+        assert await s.scalar(select(User).where(User.matrix_id.is_not(None))) is None
