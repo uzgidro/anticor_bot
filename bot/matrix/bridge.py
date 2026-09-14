@@ -1,11 +1,13 @@
-"""Matrix bridge: submissions -> room cards, room replies -> SubmissionActions.
+"""Matrix bridge: submissions -> DM cards, DM replies -> SubmissionActions.
 
-Every room event is handled in its own DB session (commit on success, rollback
-on error) — the middleware chain does not run for Matrix events. The member
-who acts is provisioned as a User on first sight with the role of the room
-the message came from; from there on the rules are exactly the Telegram ones:
-``SubmissionActions.authorize`` derives the type from the submission row, so
-a card answered from the wrong room never grants a foreign type.
+Every responsible with a Matrix id has a private room with the bot
+(``users.matrix_room_id``); a new submission is delivered to every such room
+of its type — the Matrix counterpart of the Telegram push card. Roles come
+from the admin's /assign, never from a room. An inbound event is honoured only
+if it comes from the owner of that DM, and every action then runs through
+``SubmissionActions.authorize`` with the type taken from the submission row.
+Every room event is handled in its own DB session (commit on success,
+rollback on error) — the middleware chain does not run for Matrix events.
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from bot.config import MatrixSettings
-from bot.db.models import AttachmentType, Submission, SubmissionType, User
+from bot.db.models import AttachmentType, Submission, User
 from bot.db.repositories import MatrixDeliveryRepository, UserRepository
 from bot.matrix.client import RoomEvent
 from bot.matrix.render import parse_command, render_room_card, strip_reply_fallback
@@ -59,6 +61,7 @@ class MatrixBridge:
         """Connect and sync forever; reconnect with backoff. Never raises —
         Telegram must keep working whatever happens to Matrix."""
         self.client.on_message(self.handle_event)
+        self.client.on_direct_room(self.on_direct_room)
         delay = _RECONNECT_MIN
         while True:
             try:
@@ -77,100 +80,125 @@ class MatrixBridge:
     # --- CardSink ----------------------------------------------------------
 
     async def announce(self, session: AsyncSession, submission_id: int) -> bool:
+        """Deliver the card (with attachments) to every responsible's DM.
+        True if at least one recipient got it."""
         sub = await self._load(session, submission_id)
         if sub is None:
             return False
-        room = self.settings.room_for(sub.type.value)
-        if not room:
-            return False
+        users = UserRepository(session)
         deliveries = MatrixDeliveryRepository(session)
-
-        failed = 0
-        uploaded: list[str] = []
-        for index, att in enumerate(sub.attachments):
-            event_id = await self._upload_attachment(room, sub.public_id, index, att)
-            if event_id:
-                uploaded.append(event_id)
-            else:
-                failed += 1
-
-        text = render_room_card(
-            self.core, self.settings.locale, sub,
-            assignee_name=await self._assignee_name(session, sub),
-            attachment_count=len(sub.attachments), failed_attachments=failed,
-        )
-        card_id = await self.client.send_html(room, text)
-        if not card_id:
-            return False
-        await deliveries.add(sub.id, room, card_id, "card")
-        for event_id in uploaded:
-            await deliveries.add(sub.id, room, event_id, "attachment")
-        return True
+        assignee = await self._assignee_name(session, sub)
+        delivered = 0
+        for user in await users.matrix_responsibles_for(sub.type):
+            room = await self._ensure_room(users, user)
+            if not room:
+                continue
+            failed = 0
+            uploaded: list[str] = []
+            for index, att in enumerate(sub.attachments):
+                event_id = await self._upload_attachment(room, sub.public_id, index, att)
+                if event_id:
+                    uploaded.append(event_id)
+                else:
+                    failed += 1
+            text = render_room_card(
+                self.core, self.settings.locale, sub, assignee_name=assignee,
+                attachment_count=len(sub.attachments), failed_attachments=failed,
+            )
+            card_id = await self.client.send_html(room, text)
+            if not card_id:
+                continue
+            await deliveries.add(sub.id, room, card_id, "card")
+            for event_id in uploaded:
+                await deliveries.add(sub.id, room, event_id, "attachment")
+            delivered += 1
+        return delivered > 0
 
     async def refresh(self, session: AsyncSession, submission_id: int) -> None:
         sub = await self._load(session, submission_id)
         if sub is None:
             return
-        card = await MatrixDeliveryRepository(session).card_for(sub.id)
-        if card is None:
+        cards = await MatrixDeliveryRepository(session).cards_for(sub.id)
+        if not cards:
             return
         text = render_room_card(
             self.core, self.settings.locale, sub,
             assignee_name=await self._assignee_name(session, sub),
             attachment_count=len(sub.attachments),
         )
-        await self.client.edit_html(card.room_id, card.event_id, text)
+        for card in cards:
+            await self.client.edit_html(card.room_id, card.event_id, text)
+
+    async def _ensure_room(self, users: UserRepository, user: User) -> str:
+        """The user's DM room, creating and binding it on first delivery.
+        '' if it cannot be created (the recipient is skipped this time)."""
+        if user.matrix_room_id:
+            return user.matrix_room_id
+        room = await self.client.create_dm(user.matrix_id)
+        if not room:
+            logger.warning("Could not open a Matrix DM for a responsible; skipping")
+            return ""
+        await users.bind_matrix_room(user, room)
+        return room
+
+    # --- DM binding --------------------------------------------------------
+
+    async def on_direct_room(self, room_id: str, user_id: str) -> None:
+        """A person opened a 1:1 room with the bot: remember it as their DM and
+        tell them their id, which is what the admin passes to /assign."""
+        async with self.pool() as session:
+            try:
+                users = UserRepository(session)
+                name = await self.client.member_display_name(room_id, user_id)
+                user, _ = await users.get_or_create_by_matrix_id(user_id, name)
+                await users.bind_matrix_room(user, room_id)
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+        await self.client.send_html(
+            room_id, self.core.get("mx-dm-welcome", self.settings.locale, id=escape(user_id))
+        )
 
     # --- inbound -----------------------------------------------------------
 
     async def handle_event(self, event: RoomEvent) -> None:
         if event.sender == self.client.user_id or event.server_ts < self.client.started_ms:
             return
-        room_type = self.settings.type_for_room(event.room_id)
-        if room_type is None:
-            return
-
-        body = strip_reply_fallback(event.body)
-        command, args = parse_command(body)
-
-        if command == "yordam":
-            await self.client.send_html(
-                event.room_id, self.core.get("mx-help", self.settings.locale)
-            )
-            return
-
         async with self.pool() as session:
             try:
-                await self._handle(session, event, room_type, body, command, args)
+                user = await UserRepository(session).by_matrix_room(event.room_id)
+                if user is None or user.matrix_id != event.sender:
+                    return  # not a DM we own, or someone else inside it
+                await self._handle(session, event, user)
                 await session.commit()
             except Exception:
                 await session.rollback()
                 raise
 
-    async def _handle(
-        self, session: AsyncSession, event: RoomEvent, room_type: str,
-        body: str, command: str | None, args: str,
-    ) -> None:
+    async def _handle(self, session: AsyncSession, event: RoomEvent, user: User) -> None:
+        body = strip_reply_fallback(event.body)
+        command, args = parse_command(body)
+        room = event.room_id
+
+        if command == "yordam":
+            await self.client.send_html(room, self.core.get("mx-help", self.settings.locale))
+            return
+
         sub_id = await self._resolve(session, event, command, args)
         if sub_id is None:
-            return  # ordinary conversation between staff
+            return  # ordinary conversation
 
-        name = await self.client.member_display_name(event.room_id, event.sender)
-        user, _ = await UserRepository(session).get_or_create_matrix(
-            event.sender, name or event.sender.lstrip("@").split(":")[0],
-            SubmissionType(room_type),
-        )
         actions = SubmissionActions(
             session, self.bot, self.core, self.cipher, self.default_locale, sinks=[self],
         )
-        room = event.room_id
 
         if command == "karta":
             sub = await actions.authorize(sub_id, user)
             if sub is None:
                 await self._note(room, event, "mx-forbidden")
                 return
-            await self._repost(session, sub)
+            await self._repost(session, sub, room)
             return
 
         if command == "olish":
@@ -257,9 +285,8 @@ class MatrixBridge:
             room, self.core.get(key, self.settings.locale, **kw), reply_to=event.event_id
         )
 
-    async def _repost(self, session: AsyncSession, sub: Submission) -> None:
+    async def _repost(self, session: AsyncSession, sub: Submission, room: str) -> None:
         sub = await self._load(session, sub.id) or sub  # attachments eagerly loaded
-        room = self.settings.room_for(sub.type.value)
         text = render_room_card(
             self.core, self.settings.locale, sub,
             assignee_name=await self._assignee_name(session, sub),
