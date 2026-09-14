@@ -67,36 +67,45 @@ class UserRepository:
     async def get_by_matrix_id(self, matrix_id: str) -> User | None:
         return await self.session.scalar(select(User).where(User.matrix_id == matrix_id))
 
-    async def get_or_create_matrix(
-        self, matrix_id: str, full_name: str | None, type_: SubmissionType
+    async def get_or_create_by_matrix_id(
+        self, matrix_id: str, full_name: str | None = None
     ) -> tuple[User, bool]:
-        """Provision a room member as a User on first sight.
-
-        Room membership is the only grant: a member of the appeal room gets
-        resp_appeal, of the corruption room resp_corruption. The flag is ensured
-        on every call, so one person acting in both rooms ends up with both.
-        Matrix-only users are never admins.
-        """
+        """Find or create the User behind a Matrix id. Grants nothing: roles come
+        from the admin's /assign, exactly like Telegram users."""
         user = await self.get_by_matrix_id(matrix_id)
-        created = False
-        if user is None:
-            user = User(matrix_id=matrix_id, full_name=full_name)
-            self.session.add(user)
-            try:
-                await self.session.flush()
-            except IntegrityError:
-                await self.session.rollback()
-                existing = await self.get_by_matrix_id(matrix_id)
-                if existing is None:
-                    raise
-                user = existing
-            else:
-                created = True
-        flag = "resp_appeal" if type_ == SubmissionType.appeal else "resp_corruption"
-        if not getattr(user, flag):
-            setattr(user, flag, True)
+        if user is not None:
+            return user, False
+        user = User(matrix_id=matrix_id, full_name=full_name)
+        self.session.add(user)
+        try:
             await self.session.flush()
-        return user, created
+        except IntegrityError:
+            await self.session.rollback()
+            existing = await self.get_by_matrix_id(matrix_id)
+            if existing is None:
+                raise
+            return existing, False
+        return user, True
+
+    async def by_matrix_room(self, room_id: str) -> User | None:
+        return await self.session.scalar(select(User).where(User.matrix_room_id == room_id))
+
+    async def bind_matrix_room(self, user: User, room_id: str) -> None:
+        """Bind the user's DM room once; a later room (e.g. a second DM the user
+        opened) never replaces the first, so deliveries stay in one place."""
+        if user.matrix_room_id:
+            return
+        user.matrix_room_id = room_id
+        await self.session.flush()
+
+    async def matrix_responsibles_for(self, type_: SubmissionType) -> list[User]:
+        """Responsibles reachable in Matrix (the DM counterpart of responsibles_for)."""
+        col = User.resp_appeal if type_ == SubmissionType.appeal else User.resp_corruption
+        return list(
+            await self.session.scalars(
+                select(User).where(col.is_(True), User.matrix_id.is_not(None)).order_by(User.id)
+            )
+        )
 
     async def set_language(self, user: User, language: str) -> None:
         user.language = language
@@ -329,10 +338,15 @@ class MatrixDeliveryRepository:
             )
         )
 
-    async def card_for(self, submission_id: int) -> MatrixDelivery | None:
-        return await self.session.scalar(
-            select(MatrixDelivery)
-            .where(MatrixDelivery.submission_id == submission_id, MatrixDelivery.kind == "card")
-            .order_by(MatrixDelivery.id.desc())
-            .limit(1)
+    async def cards_for(self, submission_id: int) -> list[MatrixDelivery]:
+        """Every editable card of the submission — one per DM it was delivered to."""
+        return list(
+            await self.session.scalars(
+                select(MatrixDelivery)
+                .where(
+                    MatrixDelivery.submission_id == submission_id,
+                    MatrixDelivery.kind == "card",
+                )
+                .order_by(MatrixDelivery.id)
+            )
         )
