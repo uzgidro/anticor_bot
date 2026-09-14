@@ -45,16 +45,18 @@ class RedisSettings(BaseSettings):
 class MatrixSettings(BaseSettings):
     """Matrix (Element) bridge. Empty homeserver/user = bridge disabled.
 
-    Rooms are per submission type; membership of a room is what provisions a
-    User with the matching resp_<type> flag (see services/actions + matrix/bridge).
+    Cards are delivered to each responsible's private room with the bot
+    (users.matrix_room_id); roles are granted by the admin's /assign, so no
+    room configuration is needed here.
     """
+
+    # A leftover MATRIX__ROOM_* in an old .env must not stop the bot.
+    model_config = SettingsConfigDict(extra="ignore")
 
     homeserver: str = ""
     user: str = ""
     password: SecretStr = SecretStr("")
     token: SecretStr = SecretStr("")
-    room_appeal: str = ""
-    room_corruption: str = ""
     locale: str = "uz_latn"
     store_dir: str = "matrix_store"
     device_name: str = "anticor-bot"
@@ -63,18 +65,6 @@ class MatrixSettings(BaseSettings):
     def enabled(self) -> bool:
         has_secret = bool(self.password.get_secret_value() or self.token.get_secret_value())
         return bool(self.homeserver and self.user and has_secret)
-
-    def room_for(self, type_value: str) -> str:
-        """Room id for a SubmissionType value ('appeal' | 'corruption'), '' if unset."""
-        return self.room_appeal if type_value == "appeal" else self.room_corruption
-
-    def type_for_room(self, room_id: str) -> str | None:
-        """Inverse of room_for: which submission type a room serves, or None."""
-        if room_id and room_id == self.room_appeal:
-            return "appeal"
-        if room_id and room_id == self.room_corruption:
-            return "corruption"
-        return None
 
 
 class Settings(BaseSettings):

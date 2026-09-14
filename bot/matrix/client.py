@@ -18,6 +18,7 @@ from nio import (
     AsyncClientConfig,
     RoomMessageMedia,
     RoomMessageText,
+    RoomPreset,
     SyncResponse,
 )
 
@@ -54,7 +55,18 @@ def room_event_from_source(source: dict) -> RoomEvent:
     )
 
 
+def _invite_members(info) -> list[str]:
+    """Member ids from an invite's stripped state (m.room.member events)."""
+    seen: list[str] = []
+    for ev in getattr(info, "invite_state", None) or []:
+        mxid = getattr(ev, "state_key", None) or getattr(ev, "sender", None)
+        if mxid and mxid not in seen:
+            seen.append(mxid)
+    return seen
+
+
 MessageHandler = Callable[[RoomEvent], Awaitable[None]]
+DirectRoomHandler = Callable[[str, str], Awaitable[None]]  # (room_id, other user id)
 
 
 class MatrixClient:
@@ -64,9 +76,13 @@ class MatrixClient:
         self.started_ms = 0
         self._client: AsyncClient | None = None
         self._handler: MessageHandler | None = None
+        self._dm_handler: DirectRoomHandler | None = None
 
     def on_message(self, handler: MessageHandler) -> None:
         self._handler = handler
+
+    def on_direct_room(self, handler: DirectRoomHandler) -> None:
+        self._dm_handler = handler
 
     # --- lifecycle ---------------------------------------------------------
 
@@ -119,15 +135,28 @@ class MatrixClient:
     # --- inbound -----------------------------------------------------------
 
     async def _on_sync(self, response) -> None:
-        """Accept pending invites so operators only have to invite the bot."""
+        """Accept pending invites. A 1:1 room is a responsible's DM — hand it to
+        the bridge; anything larger just gets its id echoed for the operator."""
         assert self._client is not None
-        for room_id in list(getattr(response.rooms, "invite", {}) or {}):
+        invites = getattr(response.rooms, "invite", {}) or {}
+        for room_id, info in list(invites.items()):
             result = await self._client.join(room_id)
-            if getattr(result, "room_id", None):
-                logger.info("Joined Matrix room %s", room_id)
-                await self.send_html(room_id, f"Room id: <code>{room_id}</code>")
-            else:
+            if not getattr(result, "room_id", None):
                 logger.warning("Could not join Matrix room %s", room_id)
+                continue
+            logger.info("Joined Matrix room %s", room_id)
+            # Members arrive with the next sync; until then the invite's
+            # stripped state is the only membership we have.
+            members = self._member_ids(room_id) or _invite_members(info)
+            others = [m for m in members if m != self.user_id]
+            if len(others) == 1 and self._dm_handler is not None:
+                await self._dm_handler(room_id, others[0])
+            else:
+                await self.send_html(room_id, f"Room id: <code>{room_id}</code>")
+
+    def _member_ids(self, room_id: str) -> list[str]:
+        room = self._client.rooms.get(room_id) if self._client is not None else None
+        return list(getattr(room, "users", {}) or {}) if room is not None else []
 
     async def _on_text(self, room, event) -> None:
         if self._handler is None or event.sender == self.user_id:
@@ -210,6 +239,23 @@ class MatrixClient:
             )
         except Exception:  # noqa: BLE001
             logger.debug("Matrix reaction failed", exc_info=True)
+
+    async def create_dm(self, user_id: str) -> str:
+        """Open a private room with ``user_id``. '' if the server refuses."""
+        if self._client is None:
+            return ""
+        try:
+            resp = await self._client.room_create(
+                is_direct=True, invite=[user_id], preset=RoomPreset.trusted_private_chat,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Matrix room_create failed")
+            return ""
+        room_id = getattr(resp, "room_id", None)
+        if not room_id:
+            logger.warning("Matrix DM creation rejected: %s", type(resp).__name__)
+            return ""
+        return room_id
 
     async def member_display_name(self, room_id: str, user_id: str) -> str | None:
         if self._client is None:

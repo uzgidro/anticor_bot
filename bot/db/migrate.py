@@ -34,6 +34,9 @@ def _config(dsn: str) -> Config:
     # env.py reads the DSN from app config by default; override it explicitly so
     # callers (and tests) can target a specific database.
     cfg.set_main_option("sqlalchemy.url", dsn)
+    # Leave logging to the app (see alembic/env.py); the ini's logging section
+    # would reset the root logger and drop the PII-redacting handler.
+    cfg.attributes["configure_logging"] = False
     return cfg
 
 

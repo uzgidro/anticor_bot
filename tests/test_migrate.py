@@ -107,3 +107,46 @@ def test_upgrade_adds_matrix_schema(tmp_path):
         assert "matrix_deliveries" in tables
     finally:
         con.close()
+
+
+def test_programmatic_upgrade_keeps_app_logging(tmp_path):
+    """alembic.ini's fileConfig would reset the root level to WARNING and disable
+    every existing logger (the bot would go silent after startup migrations).
+    The programmatic path must leave logging alone."""
+    import logging
+
+    root = logging.getLogger()
+    app = logging.getLogger("bot.test_probe")
+    old_level, old_handlers = root.level, list(root.handlers)
+    marker = logging.NullHandler()
+    root.addHandler(marker)
+    root.setLevel(logging.INFO)
+    try:
+        url, _ = _sqlite_url(tmp_path)
+        upgrade_to_head(url)
+        assert root.level == logging.INFO
+        assert marker in root.handlers
+        assert app.disabled is False
+    finally:
+        root.removeHandler(marker)
+        root.setLevel(old_level)
+        root.handlers[:] = old_handlers
+
+
+def test_upgrade_adds_matrix_room_column(tmp_path):
+    """Revision 0003: users.matrix_room_id (DM with the bot), unique, nullable."""
+    url, db_path = _sqlite_url(tmp_path)
+    upgrade_to_head(url)
+    con = sqlite3.connect(db_path)
+    try:
+        cols = {row[1]: row for row in con.execute("PRAGMA table_info(users)")}
+        assert "matrix_room_id" in cols
+        assert cols["matrix_room_id"][3] == 0  # nullable
+        unique_cols = set()
+        for row in con.execute("PRAGMA index_list(users)").fetchall():
+            if row[2]:  # unique index
+                for c in con.execute(f"PRAGMA index_info('{row[1]}')"):
+                    unique_cols.add(c[2])
+        assert "matrix_room_id" in unique_cols
+    finally:
+        con.close()
