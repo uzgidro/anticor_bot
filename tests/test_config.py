@@ -134,14 +134,12 @@ def test_matrix_enabled_with_password_or_token(base_env, monkeypatch):
     assert s.matrix.enabled is True
 
 
-def test_matrix_room_mapping(base_env, monkeypatch):
+def test_matrix_settings_have_no_room_mapping(base_env, monkeypatch):
+    """Cards go to per-user DMs; a leftover MATRIX__ROOM_* in .env is ignored."""
     from bot.config import Settings
 
     monkeypatch.setenv("MATRIX__ROOM_APPEAL", "!a:example.uz")
-    monkeypatch.setenv("MATRIX__ROOM_CORRUPTION", "!c:example.uz")
     s = Settings(_env_file=None)
-    assert s.matrix.room_for("appeal") == "!a:example.uz"
-    assert s.matrix.room_for("corruption") == "!c:example.uz"
-    assert s.matrix.type_for_room("!a:example.uz") == "appeal"
-    assert s.matrix.type_for_room("!c:example.uz") == "corruption"
-    assert s.matrix.type_for_room("!other:example.uz") is None
+    assert not hasattr(s.matrix, "room_appeal")
+    assert not hasattr(s.matrix, "room_for")
+
