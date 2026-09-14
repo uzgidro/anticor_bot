@@ -63,3 +63,6 @@ def setup_logging(*, debug: bool = False) -> None:
     # SQLAlchemy echo would log bound params (submission text/name/phone) — keep
     # it at WARNING regardless of debug so PII never reaches logs via SQL.
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    # matrix-nio narrates every room state event at INFO, member ids included
+    # — pure noise for operations and identifiers we don't want in logs.
+    logging.getLogger("nio").setLevel(logging.WARNING)
