@@ -98,15 +98,21 @@ A second channel for responsibles, on the same rights. Take/close/reply live
 `handlers/responsible.py` and `matrix/bridge.py` are adapters over it. Never
 put a second copy of those sequences anywhere.
 
-- `users.tg_id` is **nullable**: a room member is provisioned as a `User` with
-  `matrix_id` on first action (`UserRepository.get_or_create_matrix`), role =
-  the room's type. `responsibles_for()` excludes `tg_id IS NULL` — never send
-  Telegram messages to Matrix-only users. `CHECK ck_users_identity` requires
-  one of the two ids.
-- Authorization is still `SubmissionActions.authorize()` with the type taken
-  from the submission row — a card addressed from the wrong room grants
-  nothing. `authorize()` re-reads the row because `try_claim`/`close` are Core
-  UPDATEs that bypass the identity map.
+- Cards go to each responsible's **DM** with the bot (`users.matrix_room_id`,
+  one room per user). The DM is bound either when the person writes to the
+  bot (`MatrixClient._on_sync` → `bridge.on_direct_room`) or when the bot
+  creates it on first delivery (`_ensure_room` → `client.create_dm`). There
+  are no `MATRIX__ROOM_*` settings; shared rooms are ignored.
+- Roles are granted only by `/assign` (`@user:server` accepted) — nothing is
+  provisioned from a room. `matrix_responsibles_for()` is the Matrix
+  counterpart of `responsibles_for()`, which still excludes `tg_id IS NULL`
+  (never send Telegram messages to Matrix-only users). `CHECK
+  ck_users_identity` requires one of the two ids.
+- Inbound: `by_matrix_room(room)` must return a user whose `matrix_id ==
+  sender`, otherwise the event is dropped. Then `SubmissionActions.authorize()`
+  with the type taken from the submission row. `authorize()` re-reads the row
+  because `try_claim`/`close` are Core UPDATEs that bypass the identity map.
+- `refresh()` edits **every** card of the submission (one per DM).
 - Reply resolution is room-scoped (`matrix_deliveries(room_id, event_id)`).
 - Cross-channel redraw goes through the `CardSink` protocol; handlers get
   `card_sinks` from dispatcher context and never import `bot.matrix`
@@ -115,8 +121,12 @@ put a second copy of those sequences anywhere.
   session per event (commit/rollback like `DbSessionMiddleware`).
 - Rooms are unencrypted (no `[e2e]` extra, no libolm). Room strings are
   `mx-*` keys in all five `.ftl` files, rendered in `MATRIX__LOCALE`.
+- Startup migrations set `config.attributes["configure_logging"] = False` so
+  `alembic/env.py` skips `fileConfig` — otherwise the bot went silent (and
+  lost the PII filter) after `upgrade head`.
 - Local Python here may be older than 3.11; run the suite in Docker
   (`python:3.12-slim`, `pip install -e .[dev]`, then `ruff check bot tests && pytest -q`).
+  Behind a TLS-intercepting proxy add `-e PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org"`.
 
 ### Multi-locale messaging
 
