@@ -18,7 +18,11 @@ from bot.db import models  # noqa: F401
 from bot.db.base import Base
 
 config = context.config
-if config.config_file_name is not None:
+# The bot runs migrations in-process at startup (bot/db/migrate.py) and marks
+# the config so alembic.ini's logging section does not clobber the app's
+# logging: fileConfig() resets the root level and disables existing loggers,
+# which silenced the bot after migrations. The CLI path still configures.
+if config.config_file_name is not None and config.attributes.get("configure_logging", True):
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata

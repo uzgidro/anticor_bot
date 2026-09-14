@@ -107,3 +107,27 @@ def test_upgrade_adds_matrix_schema(tmp_path):
         assert "matrix_deliveries" in tables
     finally:
         con.close()
+
+
+def test_programmatic_upgrade_keeps_app_logging(tmp_path):
+    """alembic.ini's fileConfig would reset the root level to WARNING and disable
+    every existing logger (the bot would go silent after startup migrations).
+    The programmatic path must leave logging alone."""
+    import logging
+
+    root = logging.getLogger()
+    app = logging.getLogger("bot.test_probe")
+    old_level, old_handlers = root.level, list(root.handlers)
+    marker = logging.NullHandler()
+    root.addHandler(marker)
+    root.setLevel(logging.INFO)
+    try:
+        url, _ = _sqlite_url(tmp_path)
+        upgrade_to_head(url)
+        assert root.level == logging.INFO
+        assert marker in root.handlers
+        assert app.disabled is False
+    finally:
+        root.removeHandler(marker)
+        root.setLevel(old_level)
+        root.handlers[:] = old_handlers
