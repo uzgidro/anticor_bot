@@ -90,7 +90,7 @@ submission-closed-notify = ✅ { $public_id } murojaatingiz yopildi.
 
 # ===== Administrator =====
 admin-only = ⛔ Bu buyruq faqat administratorlar uchun.
-admin-assign-usage = Foydalanish: foydalanuvchi xabarini yoʻnaltiring yoki uning ID raqamini kiriting, soʻng turini tanlang.
+admin-assign-usage = Foydalanish: foydalanuvchi xabarini yoʻnaltiring, Telegram ID yoki Matrix ID (@user:server) kiriting, soʻng turini tanlang.
 admin-assign-choose-type = Foydalanuvchi uchun masʼullik turini tanlang:
 btn-resp-appeal = 📝 Murojaatlar uchun masʼul
 btn-resp-corruption = 🛡 Shikoyatlar uchun masʼul
@@ -138,3 +138,4 @@ mx-already-closed = ℹ️ Murojaat allaqachon yopilgan
 mx-forbidden = ⚠️ Bu turdagi murojaatlar uchun sizda huquq yoʻq
 mx-reply-undeliverable = ⚠️ Murojaatchiga yetkazib boʻlmadi (u botni bloklagan boʻlishi mumkin). Javob saqlandi.
 mx-help = <b>Buyruqlar</b> (kartochkaga reply qilib):<br/>• matn — murojaatchiga javob<br/>• <code>!olish</code> — ishga olish<br/>• <code>!yopish</code> — yopish<br/>• <code>!karta</code> — kartochkani qayta koʻrsatish<br/>• <code>!yordam</code> — shu roʻyxat
+mx-dm-welcome = 👋 Sizning Matrix ID: <code>{ $id }</code><br/>Administrator Telegram'da <code>/assign { $id }</code> buyrugʻi bilan sizga rol tayinlashi kerak. Shundan soʻng murojaatlar shu yerga keladi.

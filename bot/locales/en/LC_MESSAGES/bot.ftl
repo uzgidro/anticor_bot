@@ -90,7 +90,7 @@ submission-closed-notify = ✅ Your submission { $public_id } has been closed.
 
 # ===== Admin =====
 admin-only = ⛔ This command is for administrators only.
-admin-assign-usage = Usage: forward a user's message or provide their ID, then choose the type.
+admin-assign-usage = Usage: forward the user's message, or give their Telegram ID or Matrix ID (@user:server), then pick the type.
 admin-assign-choose-type = Choose the responsibility type for the user:
 btn-resp-appeal = 📝 Responsible for appeals
 btn-resp-corruption = 🛡 Responsible for complaints
@@ -138,3 +138,4 @@ mx-already-closed = ℹ️ Already closed
 mx-forbidden = ⚠️ You are not allowed to handle this type of submission
 mx-reply-undeliverable = ⚠️ Could not deliver to the applicant (they may have blocked the bot). The answer was saved.
 mx-help = <b>Commands</b> (as a reply to a card):<br/>• text — answer the applicant<br/>• <code>!olish</code> — take<br/>• <code>!yopish</code> — close<br/>• <code>!karta</code> — show the card again<br/>• <code>!yordam</code> — this help
+mx-dm-welcome = 👋 Your Matrix ID: <code>{ $id }</code><br/>An administrator must grant you a role with <code>/assign { $id }</code> in Telegram. Submissions will then arrive here.

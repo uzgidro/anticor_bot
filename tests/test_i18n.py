@@ -79,3 +79,15 @@ async def test_critical_keys_resolve_distinctly():
 
         hint = core.get("form-text-anon-hint", loc)
         assert hint and hint != core.get("form-ask-text", loc)
+
+
+@pytest.mark.asyncio
+async def test_dm_welcome_carries_the_id():
+    from aiogram_i18n.cores.fluent_runtime_core import FluentRuntimeCore
+
+    core = FluentRuntimeCore(path=str(LOCALES_DIR / "{locale}" / "LC_MESSAGES"))
+    await core.startup()
+    for loc in LOCALES:
+        text = core.get("mx-dm-welcome", loc, id="@x:y")
+        assert "@x:y" in text, loc
+        assert "/assign" in text, loc

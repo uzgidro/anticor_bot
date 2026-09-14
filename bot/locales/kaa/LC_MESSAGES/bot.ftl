@@ -90,7 +90,7 @@ submission-closed-notify = ✅ { $public_id } múrájátińiz jabıldı.
 
 # ===== Administrator =====
 admin-only = ⛔ Bul buyrıq tek administratorlar ushın.
-admin-assign-usage = Paydalanıw: paydalanıwshı xabarın baǵdarlań yamasa onıń ID nomerin kiritiń, soń túrin saylań.
+admin-assign-usage = Paydalanıw: paydalanıwshı xabarın baǵdarlań, Telegram ID yamasa Matrix ID (@user:server) kiritiń, soń túrin saylań.
 admin-assign-choose-type = Paydalanıwshı ushın juwapkershilik túrin saylań:
 btn-resp-appeal = 📝 Múrájátler ushın juwapker
 btn-resp-corruption = 🛡 Shaǵımlar ushın juwapker
@@ -139,3 +139,4 @@ mx-already-closed = ℹ️ Múrájat álle qashan jabılǵan
 mx-forbidden = ⚠️ Bul túrdegi múrájatlar ushın sizde huqıq joq
 mx-reply-undeliverable = ⚠️ Múrájat iyesine jetkerip bolmadı (ol bottı bloklaǵan bolıwı múmkin). Juwap saqlandı.
 mx-help = <b>Buyrıqlar</b> (kartochkaǵa reply etip):<br/>• tekst — múrájat iyesine juwap<br/>• <code>!olish</code> — jumısqa alıw<br/>• <code>!yopish</code> — jabıw<br/>• <code>!karta</code> — kartochkanı qayta kórsetiw<br/>• <code>!yordam</code> — usı dizim
+mx-dm-welcome = 👋 Sizdiń Matrix ID: <code>{ $id }</code><br/>Administrator Telegram'da <code>/assign { $id }</code> buyrıǵı menen sizge rol tayınlawı kerek. Sonnan soń múrájatlar usı jerge keledi.
