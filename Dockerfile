@@ -4,6 +4,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
+# Pull in Debian security fixes the base image does not yet carry — the
+# Trivy gate in CI blocks the deploy on any fixable HIGH/CRITICAL.
+RUN apt-get update     && apt-get upgrade -y --no-install-recommends     && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Application sources. .dockerignore keeps .env and the local .venv out of the
