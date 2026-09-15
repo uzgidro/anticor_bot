@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from aiogram import Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import ErrorEvent
 
 router = Router(name="errors")
@@ -37,11 +38,17 @@ def _user_locale(update, default_locale: str) -> str:
 
 async def on_error(event: ErrorEvent, core=None, default_locale: str = "ru") -> bool:
     update = event.update
+    exc = event.exception
+    # Telegram's own description ("message can't be edited", "query is too
+    # old") is a fixed API string, never user content — safe and diagnostic.
+    # Any other exception's message may quote the update, so only its class.
+    detail = f" ({exc.message})" if isinstance(exc, TelegramAPIError) else ""
     logger.error(
-        "update_id=%s type=%s failed: %s",
+        "update_id=%s type=%s failed: %s%s",
         getattr(update, "update_id", "?"),
         update.event_type if update else "?",
-        type(event.exception).__name__,
+        type(exc).__name__,
+        detail,
     )
     # Best-effort generic notice to the user (no details, no PII).
     try:
